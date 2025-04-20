@@ -869,7 +869,7 @@ app.post("/zalopay/create-order", async (req, res) => {
       amount,
       description,
       bank_code: "",
-      callback_url: "https://ce55-2a09-bac5-d46f-1028-00-19c-277.ngrok-free.app/zalopay/callback", // nếu cần
+      callback_url: "https://pos-0s3v.onrender.com/zalopay/callback", 
     };
 
     const dataStr =

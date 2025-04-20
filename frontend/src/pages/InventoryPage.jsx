@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash, Image as ImageIcon, Search, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { notification, Modal } from 'antd';
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 const CLOUDINARY_API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
+const API_URL = import.meta.env.VITE_API_URL;
 
 const InventoryPage = () => {
   const [products, setProducts] = useState([]);
@@ -57,7 +57,7 @@ const InventoryPage = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3000/products');
+      const response = await fetch(`${API_URL}/products`);
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -70,7 +70,7 @@ const InventoryPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:3000/categories');
+      const response = await fetch(`${API_URL}/categories`);
       const data = await response.json();
       setCategories(data);
     } catch (error) {
@@ -141,7 +141,7 @@ const InventoryPage = () => {
         return;
       }
   
-      const response = await fetch('http://localhost:3000/products', {
+      const response = await fetch(`${API_URL}/products`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ const InventoryPage = () => {
         return;
       }
   
-      const response = await fetch('http://localhost:3000/categories', {
+      const response = await fetch(`${API_URL}/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +207,7 @@ const InventoryPage = () => {
         return;
       }
   
-      const response = await fetch(`http://localhost:3000/categories/${selectedCategory.id}`, {
+      const response = await fetch(`${API_URL}/categories/${selectedCategory.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +251,7 @@ const InventoryPage = () => {
     try {
       setIsLoading(true);
       const endpoint = deleteType === 'category' ? 'categories' : 'products';
-      const response = await fetch(`http://localhost:3000/${endpoint}/${itemToDelete}`, {
+      const response = await fetch(`${API_URL}/${endpoint}/${itemToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -342,8 +342,8 @@ const InventoryPage = () => {
       };
   
       const url = isEditMode 
-        ? `http://localhost:3000/products/${selectedProduct.id}`
-        : 'http://localhost:3000/products';
+        ? `${API_URL}/products/${selectedProduct.id}`
+        : `${API_URL}/products`;
       
       const method = isEditMode ? 'PUT' : 'POST';
   

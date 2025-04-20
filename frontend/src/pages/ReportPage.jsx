@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Package, Clock, XCircle, Users, Wallet, Smartphone } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const ReportPage = () => {
   const [orderReport, setOrderReport] = useState({
     overview: {
@@ -26,7 +28,7 @@ const ReportPage = () => {
 
   const fetchOrderReport = async () => {
     try {
-      const response = await fetch('http://localhost:3000/report/orders');
+      const response = await fetch(`${API_URL}/report/orders`);
       const data = await response.json();
       setOrderReport(data);
     } catch (error) {

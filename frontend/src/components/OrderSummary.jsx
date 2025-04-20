@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const OrderSummary = () => {
   const [orderItems, setOrderItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -52,7 +54,7 @@ const OrderSummary = () => {
       interval = setInterval(async () => {
         try {
           const token = localStorage.getItem("token");
-          const response = await fetch(`http://localhost:3000/orders/${currentOrderId}`, {
+          const response = await fetch(`${API_URL}/orders/${currentOrderId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -116,7 +118,7 @@ const OrderSummary = () => {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:3000/users?phone=${phone}`,
+          `${API_URL}/users?phone=${phone}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -202,7 +204,7 @@ const OrderSummary = () => {
       const token = localStorage.getItem("token");
 
       // Tạo đơn hàng trước
-      const createOrderResponse = await fetch("http://localhost:3000/orders", {
+      const createOrderResponse = await fetch(`${API_URL}/orders`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -241,7 +243,7 @@ const OrderSummary = () => {
         setIsLoadingQR(true);
         // Sau khi có orderId -> tạo thanh toán ZaloPay
         const zalopayResponse = await fetch(
-          "http://localhost:3000/zalopay/create-order",
+          `${API_URL}/zalopay/create-order`,
           {
             method: "POST",
             headers: {

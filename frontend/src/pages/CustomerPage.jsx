@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, Mail, ShoppingBag, Search, X } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const CustomerPage = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -19,7 +21,7 @@ const CustomerPage = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/users', {
+      const response = await fetch(`${API_URL}/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -36,7 +38,7 @@ const CustomerPage = () => {
 
       const counts = {};
       for (const customer of customerList) {
-        const ordersResponse = await fetch(`http://localhost:3000/users/${customer.id}/orders`, {
+        const ordersResponse = await fetch(`${API_URL}/users/${customer.id}/orders`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -63,7 +65,7 @@ const CustomerPage = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/users/${customerId}/orders`, {
+      const response = await fetch(`${API_URL}/users/${customerId}/orders`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

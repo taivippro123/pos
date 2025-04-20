@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Key, Users, Pencil, Trash, X, Search } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('staff');
   const [staffList, setStaffList] = useState([]);
@@ -40,7 +42,7 @@ const SettingsPage = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/users', {
+      const response = await fetch(`${API_URL}/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -66,7 +68,7 @@ const SettingsPage = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/register', {
+      const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -108,7 +110,7 @@ const SettingsPage = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:3000/users/${selectedStaff.id}`, {
+      const response = await fetch(`${API_URL}/users/${selectedStaff.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -152,7 +154,7 @@ const SettingsPage = () => {
           return;
         }
 
-        const response = await fetch(`http://localhost:3000/users/${staffId}`, {
+        const response = await fetch(`${API_URL}/users/${staffId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -196,7 +198,7 @@ const SettingsPage = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3000/change-password', {
+      const response = await fetch(`${API_URL}/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -4,6 +4,8 @@ import ProductCategory from "../components/ProductCategory";
 import ProductItem from "../components/ProductItem";
 import OrderSummary from "../components/OrderSummary";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const MenuPage = () => {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -20,7 +22,7 @@ const MenuPage = () => {
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/categories', {
+      const response = await fetch(`${API_URL}/categories`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -45,7 +47,7 @@ const MenuPage = () => {
   const fetchProducts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/products', {
+      const response = await fetch(`${API_URL}/products`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

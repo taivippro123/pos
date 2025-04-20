@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Search, X } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -17,7 +19,7 @@ const OrdersPage = () => {
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/orders', {
+      const response = await fetch(`${API_URL}/orders`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -41,7 +43,7 @@ const OrdersPage = () => {
   const handleViewOrder = async (order) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/orders/${order.id}`, {
+      const response = await fetch(`${API_URL}/orders/${order.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
