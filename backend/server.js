@@ -983,7 +983,7 @@ app.get("/ping", (req, res) => {
 
 // ✅ Hàm giữ app luôn sống bằng cách ping chính nó
 const keepAlive = () => {
-  const URL = "https://your-app-name.onrender.com"; // 👉 Thay bằng URL thực tế của bạn
+  const URL = "https://pos-0s3v.onrender.com/"; 
 
   setInterval(() => {
     axios.get(`${URL}/ping`)
