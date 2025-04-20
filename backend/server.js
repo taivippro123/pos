@@ -301,31 +301,31 @@ app.post("/orders", (req, res) => {
       .then((productInfos) => {
         // 2. Tạo đơn hàng
         const orderQuery = `INSERT INTO orders (user_id, total_amount, payment_method, payment_status, note) VALUES (?, ?, ?, ?, ?)`;
-        db.query(
-          orderQuery,
+    db.query(
+      orderQuery,
           [user_id, total_amount, payment_method, payment_status, note],
-          (err, orderResult) => {
-            if (err)
-              return res
-                .status(500)
-                .json({ message: "Lỗi tạo đơn hàng", error: err });
+      (err, orderResult) => {
+        if (err)
+          return res
+            .status(500)
+            .json({ message: "Lỗi tạo đơn hàng", error: err });
 
-            const orderId = orderResult.insertId;
-            const details = products.map((p) => [
-              orderId,
-              p.product_id,
-              p.product_name,
-              p.quantity,
-              p.price_at_order,
-              p.discount_percent_at_order,
-            ]);
+        const orderId = orderResult.insertId;
+        const details = products.map((p) => [
+          orderId,
+          p.product_id,
+          p.product_name,
+          p.quantity,
+          p.price_at_order,
+          p.discount_percent_at_order,
+        ]);
 
-            const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
-            db.query(detailQuery, [details], (err2) => {
-              if (err2)
-                return res
-                  .status(500)
-                  .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
+        const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
+        db.query(detailQuery, [details], (err2) => {
+          if (err2)
+            return res
+              .status(500)
+              .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
 
               // 3. Cập nhật số lượng tồn kho trong bảng products
               const updateStockPromises = products.map((product, index) => {
@@ -356,15 +356,15 @@ app.post("/orders", (req, res) => {
                       if (err) {
                         return res.status(500).json({ message: "Lỗi lấy thông tin sản phẩm", error: err });
                       }
-                      
-                      res.json({
-                        message: "Tạo đơn hàng thành công",
-                        orderId,
-                        user: {
-                          id: user_id,
-                          name: user_name,
-                          phone,
-                        },
+
+          res.json({
+            message: "Tạo đơn hàng thành công",
+            orderId,
+            user: {
+              id: user_id,
+              name: user_name,
+              phone,
+            },
                         updatedProducts: updatedProducts.map(p => ({
                           id: p.id,
                           name: p.name,
@@ -377,10 +377,10 @@ app.post("/orders", (req, res) => {
                 })
                 .catch(err => {
                   res.status(500).json({ message: "Lỗi cập nhật tồn kho", error: err });
-                });
-            });
-          }
-        );
+          });
+        });
+      }
+    );
       })
       .catch(err => {
         res.status(400).json({ message: err.message });

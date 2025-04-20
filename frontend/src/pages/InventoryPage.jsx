@@ -872,21 +872,50 @@ const InventoryPage = () => {
         </div>
       )}
 
-      <Modal
-        title="Xác nhận xóa"
-        open={isDeleteModalOpen}
-        onOk={handleConfirmDelete}
-        onCancel={() => {
-          setIsDeleteModalOpen(false);
-          setItemToDelete(null);
-          setDeleteType(null);
-        }}
-        okText="Xóa"
-        cancelText="Hủy"
-        okButtonProps={{ danger: true }}
-      >
-        <p>Bạn có chắc chắn muốn xóa {deleteType === 'category' ? 'danh mục' : 'sản phẩm'} này?</p>
-      </Modal>
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-xl m-4">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-800">Xác nhận xóa</h2>
+              <button
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setItemToDelete(null);
+                  setDeleteType(null);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700">
+                Bạn có chắc chắn muốn xóa {deleteType === 'category' ? 'danh mục' : 'sản phẩm'} này?
+              </p>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setIsDeleteModalOpen(false);
+                    setItemToDelete(null);
+                    setDeleteType(null);
+                  }}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all"
+                >
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
