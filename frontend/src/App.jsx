@@ -1,0 +1,81 @@
+// src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import MenuPage from './pages/MenuPage';
+import InventoryPage from './pages/InventoryPage';
+import OrdersPage from './pages/OrdersPage';
+import LoginPage from './pages/LoginPage';
+import CustomerPage from './pages/CustomerPage';
+import ReportPage from './pages/ReportPage';
+import SettingsPage from './pages/SettingsPage';
+import PaymentSuccessTTS from './components/PaymentSuccessTTS'; // hoặc đúng path của bạn
+
+
+const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Kiểm tra xem có token trong localStorage không
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setIsAuthenticated(false);
+  };
+
+  // Protected Route component
+  const ProtectedRoute = ({ children }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" />;
+    }
+    return children;
+  };
+
+  // Routes configuration
+  const routes = [
+    { path: '/', element: <MenuPage /> },
+    { path: '/orders', element: <OrdersPage /> },
+    { path: '/inventory', element: <InventoryPage /> },
+    { path: '/customer', element: <CustomerPage /> },
+    { path: '/report', element: <ReportPage /> },
+    { path: '/settings', element: <SettingsPage /> }
+  ];
+
+  return (
+    <Router>
+      <div className="flex h-screen bg-gray-100">
+        {isAuthenticated && <Sidebar onLogout={handleLogout} />}
+        <div className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/login" element={
+              isAuthenticated ? <Navigate to="/" /> : <LoginPage onLogin={handleLogin} />
+            } />
+            {routes.map((route) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute>
+                    {route.element}
+                  </ProtectedRoute>
+                }
+              />
+            ))}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </div>
+        <PaymentSuccessTTS />
+      </div>
+    </Router>
+  );
+};
+
+export default App;
