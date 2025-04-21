@@ -504,6 +504,237 @@ app.get("/users/:id/orders", (req, res) => {
   );
 });
 
+// API hủy đơn hàng
+app.put("/orders/:id/cancel", async (req, res) => {
+  const orderId = req.params.id;
+  const connection = await db.promise().getConnection(); // Sử dụng promise pool
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Kiểm tra trạng thái đơn hàng hiện tại
+    const [orderRows] = await connection.query(
+      "SELECT payment_status FROM orders WHERE id = ?", 
+      [orderId]
+    );
+
+    if (orderRows.length === 0) {
+      throw new Error("Đơn hàng không tồn tại");
+    }
+
+    // Chỉ cho phép hủy đơn hàng đang chờ xử lý (pending)
+    if (orderRows[0].payment_status !== 'pending') {
+      throw new Error(`Không thể hủy đơn hàng đã ở trạng thái ${orderRows[0].payment_status}`);
+    }
+
+    // 2. Lấy chi tiết đơn hàng để hoàn trả tồn kho
+    const [details] = await connection.query(
+      `SELECT od.product_id, od.quantity, p.manage_stock
+       FROM order_details od
+       JOIN products p ON od.product_id = p.id
+       WHERE od.order_id = ?`,
+      [orderId]
+    );
+
+    // 3. Cập nhật trạng thái đơn hàng thành 'cancelled'
+    await connection.query(
+      "UPDATE orders SET payment_status = 'cancelled' WHERE id = ?",
+      [orderId]
+    );
+
+    // 4. Hoàn trả số lượng tồn kho cho các sản phẩm được quản lý
+    const stockRestorePromises = details
+      .filter(item => item.manage_stock === 1 || item.manage_stock === true) // Chỉ hoàn trả nếu manage_stock = true
+      .map(item => {
+        return connection.query(
+          "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
+          [item.quantity, item.product_id]
+        );
+      });
+    await Promise.all(stockRestorePromises);
+
+    // 5. Commit transaction nếu mọi thứ thành công
+    await connection.commit();
+
+    res.json({ message: `Đơn hàng ${orderId} đã được hủy thành công.` });
+
+  } catch (error) {
+    await connection.rollback(); // Rollback transaction nếu có lỗi
+    console.error("Lỗi khi hủy đơn hàng:", error);
+    res.status(500).json({ message: error.message || "Lỗi máy chủ khi hủy đơn hàng" });
+  } finally {
+    connection.release(); // Luôn giải phóng kết nối
+  }
+});
+
+// API cập nhật đơn hàng (chủ yếu cho ZaloPay pending)
+app.put("/orders/:id", async (req, res) => {
+  const orderId = req.params.id;
+  const { products: updatedProducts, total_amount: updatedTotalAmount, note: updatedNote } = req.body;
+  const token = req.headers.authorization?.split(' ')[1]; // Assuming token check might be needed
+  const connection = await db.promise().getConnection();
+
+  if (!token) {
+    return res.status(401).json({ message: "Chưa đăng nhập" });
+  }
+
+  if (!updatedProducts || !Array.isArray(updatedProducts) || !updatedTotalAmount) {
+    return res.status(400).json({ message: "Thiếu thông tin cập nhật đơn hàng." });
+  }
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Lấy thông tin đơn hàng hiện tại và kiểm tra status
+    const [currentOrderRows] = await connection.query(
+      "SELECT user_id, payment_status, payment_method FROM orders WHERE id = ?",
+      [orderId]
+    );
+    if (currentOrderRows.length === 0) {
+      throw new Error("Đơn hàng không tồn tại");
+    }
+    const currentOrder = currentOrderRows[0];
+    if (currentOrder.payment_status !== 'pending') {
+      throw new Error(`Chỉ có thể cập nhật đơn hàng đang chờ xử lý (pending), trạng thái hiện tại: ${currentOrder.payment_status}`);
+    }
+    // Optional: Check if payment method allows update (e.g., only ZaloPay)
+    // if (currentOrder.payment_method !== 'zalopay') {
+    //   throw new Error("Chỉ đơn hàng ZaloPay mới có thể cập nhật theo cách này.");
+    // }
+
+    // 2. Lấy chi tiết đơn hàng cũ (để tính toán hoàn/trừ kho)
+    const [oldDetails] = await connection.query(
+      "SELECT product_id, quantity, p.manage_stock, p.stock_quantity as current_stock FROM order_details od JOIN products p ON od.product_id = p.id WHERE order_id = ?",
+      [orderId]
+    );
+
+    // 3. Tính toán thay đổi tồn kho
+    const stockChanges = {}; // { product_id: change_amount }
+    const oldDetailsMap = new Map(oldDetails.map(item => [item.product_id, item]));
+
+    // Tính toán trừ kho cho sản phẩm mới/tăng số lượng
+    for (const newItem of updatedProducts) {
+      const oldItem = oldDetailsMap.get(newItem.product_id);
+      const quantityChange = newItem.quantity - (oldItem ? oldItem.quantity : 0);
+      stockChanges[newItem.product_id] = (stockChanges[newItem.product_id] || 0) - quantityChange; // Âm là giảm tồn kho
+    }
+    // Tính toán hoàn kho cho sản phẩm bị xóa/giảm số lượng
+    for (const oldItem of oldDetails) {
+      if (!updatedProducts.some(newItem => newItem.product_id === oldItem.product_id)) {
+        // Product removed completely
+        stockChanges[oldItem.product_id] = (stockChanges[oldItem.product_id] || 0) + oldItem.quantity; // Dương là tăng tồn kho
+      }
+    }
+
+    // 4. Kiểm tra và cập nhật tồn kho
+    const updateStockPromises = Object.entries(stockChanges).map(async ([productId, change]) => {
+      if (change === 0) return; // Không thay đổi
+      
+      const productInfo = oldDetailsMap.get(parseInt(productId)) || 
+                          (await connection.query("SELECT manage_stock, stock_quantity FROM products WHERE id = ?", [productId]))[0][0];
+      
+      if (!productInfo) {
+         throw new Error(`Sản phẩm ID ${productId} không tồn tại để cập nhật kho.`);
+      }
+
+      const manageStock = productInfo.manage_stock === 1 || productInfo.manage_stock === true;
+
+      if (manageStock) {
+          const currentStock = productInfo.current_stock !== undefined ? productInfo.current_stock : productInfo.stock_quantity;
+          // Nếu change < 0 (giảm tồn kho), kiểm tra số lượng đủ
+          if (change < 0 && currentStock < Math.abs(change)) {
+            const [productNameRow] = await connection.query("SELECT name FROM products WHERE id = ?", [productId]);
+            throw new Error(`Sản phẩm '${productNameRow[0]?.name || productId}' không đủ số lượng tồn kho để cập nhật.`);
+          }
+          // Thực hiện cập nhật kho (cộng với số âm sẽ thành trừ)
+          return connection.query(
+            "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
+            [change, productId]
+          );
+      }
+    });
+    await Promise.all(updateStockPromises.filter(p => p)); // Lọc bỏ các promise null/undefined
+
+    // 5. Xóa chi tiết đơn hàng cũ
+    await connection.query("DELETE FROM order_details WHERE order_id = ?", [orderId]);
+
+    // 6. Thêm chi tiết đơn hàng mới
+    const newDetailsValues = updatedProducts.map((p) => [
+      orderId,
+      p.product_id,
+      p.product_name, // Ensure these are passed from frontend
+      p.quantity,
+      p.price_at_order, // Ensure these are passed from frontend
+      p.discount_percent_at_order, // Ensure these are passed from frontend
+    ]);
+    if (newDetailsValues.length > 0) {
+         const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
+        await connection.query(detailQuery, [newDetailsValues]);
+    } else {
+        // Handle case where all products removed - might need to cancel order instead?
+        throw new Error("Không thể cập nhật đơn hàng không có sản phẩm.");
+    }
+   
+
+    // 7. Cập nhật bảng orders
+    await connection.query(
+      "UPDATE orders SET total_amount = ?, note = ? WHERE id = ?",
+      [updatedTotalAmount, updatedNote, orderId]
+    );
+
+    // Commit transaction CƠ SỞ DỮ LIỆU trước khi gọi ZaloPay
+    await connection.commit();
+
+    // 8. Tạo lại yêu cầu thanh toán ZaloPay với thông tin mới
+    // *** QUAN TRỌNG: Giả sử bạn có hàm hoặc logic để lấy thông tin user/mô tả ***
+    const [userRows] = await db.promise().query("SELECT name, phone FROM users WHERE id = ?", [currentOrder.user_id]);
+    const userName = userRows[0]?.name || 'Khách hàng';
+    const userPhone = userRows[0]?.phone || '';
+    const newDescription = `Cập nhật thanh toán đơn hàng ${orderId} cho ${userName} (${userPhone})`;
+    
+    // Gọi API nội bộ để tạo lại ZaloPay order (tái sử dụng logic)
+    // Cần truyền đủ thông tin như khi tạo mới
+    const internalZaloPayReq = { 
+        orderId: orderId, 
+        amount: updatedTotalAmount, 
+        description: newDescription, 
+        // products: updatedProducts // Gửi lại thông tin sản phẩm nếu API ZaloPay cần
+    };
+
+    // Sử dụng axios để gọi chính API của mình
+    // Lưu ý: URL cần là URL đầy đủ hoặc cấu hình base URL
+    const internalApiUrl = req.protocol + '://' + req.get('host'); 
+    const zalopayResponse = await axios.post(`${internalApiUrl}/zalopay/create-order`, internalZaloPayReq, {
+        headers: { 
+            'Content-Type': 'application/json',
+             // Không cần gửi token ở đây nếu API /zalopay/create-order không yêu cầu
+        }
+    });
+
+    if (zalopayResponse.status !== 200 || !zalopayResponse.data.order_url) {
+        // Lưu ý: Không rollback DB ở đây vì DB đã commit thành công.
+        // Cần xử lý lỗi ZaloPay riêng, có thể ghi log hoặc thông báo admin.
+        console.error("Lỗi tạo lại ZaloPay sau khi cập nhật đơn hàng DB:", zalopayResponse.data);
+        throw new Error("Cập nhật đơn hàng thành công nhưng không thể tạo lại mã thanh toán ZaloPay.");
+    }
+
+    // 9. Trả về thông tin ZaloPay mới
+    res.json({ 
+      message: "Cập nhật đơn hàng và tạo lại yêu cầu ZaloPay thành công",
+      order_url: zalopayResponse.data.order_url, 
+      app_trans_id: zalopayResponse.data.app_trans_id // Trả về app_trans_id mới
+    });
+
+  } catch (error) {
+    await connection.rollback(); // Rollback nếu có lỗi TRƯỚC khi commit DB
+    console.error("Lỗi khi cập nhật đơn hàng:", error);
+    res.status(500).json({ message: error.message || "Lỗi máy chủ khi cập nhật đơn hàng" });
+  } finally {
+    connection.release();
+  }
+});
+
+
 // TRANSACTION API (ZaloPay)
 app.post("/transactions", (req, res) => {
   const {

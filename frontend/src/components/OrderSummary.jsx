@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -14,9 +16,12 @@ const OrderSummary = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [zalopayQR, setZalopayQR] = useState(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [currentOrderId, setCurrentOrderId] = useState(null);
+  const [currentAppTransId, setCurrentAppTransId] = useState(null);
 
   useEffect(() => {
     const handleAddToOrder = (event) => {
@@ -189,6 +194,20 @@ const OrderSummary = () => {
     }).format(price);
   };
 
+  const resetOrderState = () => {
+    setOrderItems([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setNote("");
+    setIsNewCustomer(false);
+    setZalopayQR(null);
+    setCurrentOrderId(null);
+    setPaymentMethod('cash');
+    setIsLoadingQR(false);
+    setIsCancelling(false);
+    setIsUpdating(false);
+  };
+
   const handlePlaceOrder = async () => {
     if (!customerPhone) {
       alert("Vui lòng nhập số điện thoại");
@@ -200,6 +219,7 @@ const OrderSummary = () => {
       return;
     }
 
+    setIsLoadingQR(true);
     try {
       const token = localStorage.getItem("token");
 
@@ -240,7 +260,6 @@ const OrderSummary = () => {
       setCurrentOrderId(orderId);
 
       if (paymentMethod === "zalopay") {
-        setIsLoadingQR(true);
         // Sau khi có orderId -> tạo thanh toán ZaloPay
         const zalopayResponse = await fetch(
           `${API_URL}/zalopay/create-order`,
@@ -274,26 +293,111 @@ const OrderSummary = () => {
 
         // Lưu URL thanh toán để hiển thị QR code
         setZalopayQR(zalopayData.order_url);
-        setIsLoadingQR(false);
-        return;
+        setCurrentAppTransId(zalopayData.app_trans_id);
+      } else {
+        // Reset form ONLY if it's cash payment
+        resetOrderState();
+        toast.success(`Đơn hàng ${orderId} (Tiền mặt) đã được tạo thành công!`);
       }
 
-      // Reset form nếu là tiền mặt
-      setOrderItems([]);
-      setCustomerName("");
-      setCustomerPhone("");
-      setNote("");
-      setIsNewCustomer(false);
-      alert(`Đơn hàng ${orderId} đã được tạo thành công!`);
     } catch (error) {
       console.error("Lỗi khi tạo đơn hàng:", error);
-      alert(error.message || "Có lỗi xảy ra khi tạo đơn hàng");
+      toast.error(error.message || "Có lỗi xảy ra khi tạo đơn hàng");
+      setCurrentOrderId(null);
+    } finally {
       setIsLoadingQR(false);
+    }
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!currentOrderId) return;
+
+    setIsUpdating(true);
+    try {
+      const token = localStorage.getItem("token");
+      const updatedTotal = calculateSubtotal();
+
+      const response = await fetch(`${API_URL}/orders/${currentOrderId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          total_amount: updatedTotal,
+          note: note,
+          products: orderItems.map(item => ({
+             product_id: item.id,
+             product_name: item.name,
+             quantity: item.quantity,
+             price_at_order: item.price,
+             discount_percent_at_order: item.discount_percent,
+           })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Không thể cập nhật đơn hàng");
+      }
+
+      setZalopayQR(data.order_url);
+      setCurrentAppTransId(data.app_trans_id);
+      toast.success("Đơn hàng đã được cập nhật. Vui lòng quét mã QR mới.");
+
+    } catch (error) {
+      console.error("Lỗi khi cập nhật đơn hàng:", error);
+      toast.error(error.message || "Có lỗi xảy ra khi cập nhật đơn hàng");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!currentOrderId) return;
+
+    setIsCancelling(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/orders/${currentOrderId}/cancel`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Không thể hủy đơn hàng");
+      }
+
+      toast.success(`Đơn hàng ${currentOrderId} đã được hủy.`);
+      resetOrderState();
+
+    } catch (error) {
+      console.error("Lỗi khi hủy đơn hàng:", error);
+      toast.error(error.message || "Có lỗi xảy ra khi hủy đơn hàng");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
   return (
     <div className="w-[350px] border-l border-gray-200 bg-white p-6 flex flex-col h-full">
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <div className="mb-6">
         <div className="space-y-2 mb-4">
           <div className="relative">
@@ -414,27 +518,63 @@ const OrderSummary = () => {
         </div>
       )}
 
-      {isLoadingQR && (
+      {isLoadingQR && !zalopayQR && (
         <div className="flex justify-center items-center mb-4">
           <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
           <span className="ml-2 text-sm text-gray-600">Đang tạo mã QR...</span>
         </div>
       )}
 
-      <button
-        onClick={handlePlaceOrder}
-        disabled={
-          orderItems.length === 0 ||
-          !customerPhone ||
-          (isNewCustomer && !customerName) ||
-          isLoadingQR
-        }
-        className="bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-      >
-        {paymentMethod === "zalopay" && zalopayQR
-          ? "Tạo đơn hàng mới"
-          : "Tạo đơn hàng"}
-      </button>
+      {isUpdating && (
+        <div className="flex justify-center items-center mb-4">
+          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+          <span className="ml-2 text-sm text-gray-600">Đang cập nhật đơn hàng...</span>
+        </div>
+      )}
+
+      <div className="mt-auto pt-4 border-t border-gray-100">
+        {paymentMethod === 'zalopay' && zalopayQR ? (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleUpdateOrder}
+              disabled={isUpdating || isCancelling || orderItems.length === 0}
+              className="bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isUpdating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Cập nhật đơn hàng #{currentOrderId}
+            </button>
+            <button
+              onClick={handleCancelOrder}
+              disabled={isCancelling || isUpdating}
+              className="bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isCancelling ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              Hủy đơn hàng #{currentOrderId}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handlePlaceOrder}
+            disabled={
+              orderItems.length === 0 ||
+              !customerPhone ||
+              (isNewCustomer && !customerName) ||
+              isLoadingQR
+            }
+            className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            { isLoadingQR ? 'Đang xử lý...' : 'Tạo đơn hàng' }
+          </button>
+        )}
+      </div>
 
       {showSuccess && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">

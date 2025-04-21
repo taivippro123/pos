@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash, Image as ImageIcon, Search, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 const CLOUDINARY_API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
@@ -43,17 +45,6 @@ const InventoryPage = () => {
     fetchCategories();
   }, []);
 
-
-  const openNotification = (type, message, description) => {
-    notification[type]({
-      message,
-      description,
-      placement: 'topRight',
-      duration: 3,
-    });
-  };
-
-  
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
@@ -112,13 +103,13 @@ const InventoryPage = () => {
         const data = await response.json();
         if (data.secure_url) {
           setNewProduct({ ...newProduct, image_url: data.secure_url });
-          openNotification('success', 'Thành công', 'Tải ảnh lên thành công');
+          toast.success('Tải ảnh lên thành công');
         } else {
           throw new Error('No secure URL returned from Cloudinary');
         }
       } catch (error) {
         console.error('Error uploading image:', error);
-        openNotification('error', 'Lỗi upload ảnh', 'Failed to upload image. Please try lại.');
+        toast.error('Lỗi upload ảnh: Failed to upload image. Please try lại.');
       }
     }
   };
@@ -127,17 +118,17 @@ const InventoryPage = () => {
     try {
       setIsLoading(true);
       if (!newProduct.name || !newProduct.price || !newProduct.category_id) {
-        openNotification('warning', 'Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+        toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc');
         return;
       }
   
       if (newProduct.manage_stock && !newProduct.stock_quantity) {
-        openNotification('warning', 'Thiếu tồn kho', 'Vui lòng nhập số lượng tồn kho');
+        toast.warning('Vui lòng nhập số lượng tồn kho');
         return;
       }
   
       if (!newProduct.image_url) {
-        openNotification('warning', 'Thiếu ảnh sản phẩm', 'Vui lòng tải ảnh sản phẩm');
+        toast.warning('Vui lòng tải ảnh sản phẩm');
         return;
       }
   
@@ -153,14 +144,14 @@ const InventoryPage = () => {
         await fetchProducts();
         setIsAddModalOpen(false);
         resetForm();
-        openNotification('success', 'Thành công', 'Thêm sản phẩm thành công');
+        toast.success('Thêm sản phẩm thành công');
       } else {
         const data = await response.json();
-        openNotification('error', 'Lỗi', data.message || 'Lỗi khi thêm sản phẩm');
+        toast.error(data.message || 'Lỗi khi thêm sản phẩm');
       }
     } catch (error) {
       console.error('Error adding product:', error);
-      openNotification('error', 'Lỗi', 'Lỗi khi thêm sản phẩm. Vui lòng thử lại.');
+      toast.error('Lỗi khi thêm sản phẩm. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +161,7 @@ const InventoryPage = () => {
     try {
       setIsLoading(true);
       if (!newCategory.name) {
-        openNotification('warning', 'Thiếu tên danh mục', 'Vui lòng nhập tên danh mục');
+        toast.warning('Vui lòng nhập tên danh mục');
         return;
       }
   
@@ -186,14 +177,14 @@ const InventoryPage = () => {
         await fetchCategories();
         setIsCategoryModalOpen(false);
         setNewCategory({ name: '', description: '' });
-        openNotification('success', 'Thành công', 'Thêm danh mục thành công');
+        toast.success('Thêm danh mục thành công');
       } else {
         const data = await response.json();
-        openNotification('error', 'Lỗi', data.message || 'Lỗi khi thêm danh mục');
+        toast.error(data.message || 'Lỗi khi thêm danh mục');
       }
     } catch (error) {
       console.error('Error adding category:', error);
-      openNotification('error', 'Lỗi', 'Lỗi khi thêm danh mục. Vui lòng thử lại.');
+      toast.error('Lỗi khi thêm danh mục. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +194,7 @@ const InventoryPage = () => {
     try {
       setIsLoading(true);
       if (!selectedCategory.name) {
-        openNotification('warning', 'Thiếu tên danh mục', 'Vui lòng nhập tên danh mục');
+        toast.warning('Vui lòng nhập tên danh mục');
         return;
       }
   
@@ -222,14 +213,14 @@ const InventoryPage = () => {
         await fetchCategories();
         setIsEditCategoryModalOpen(false);
         setSelectedCategory(null);
-        openNotification('success', 'Thành công', 'Cập nhật danh mục thành công');
+        toast.success('Cập nhật danh mục thành công');
       } else {
         const data = await response.json();
-        openNotification('error', 'Lỗi', data.message || 'Lỗi khi cập nhật danh mục');
+        toast.error(data.message || 'Lỗi khi cập nhật danh mục');
       }
     } catch (error) {
       console.error('Error updating category:', error);
-      openNotification('error', 'Lỗi', 'Lỗi khi cập nhật danh mục. Vui lòng thử lại.');
+      toast.error('Lỗi khi cập nhật danh mục. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -264,14 +255,14 @@ const InventoryPage = () => {
         } else {
           await fetchProducts();
         }
-        openNotification('success', 'Thành công', `Xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'} thành công`);
+        toast.success(`Xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'} thành công`);
       } else {
         const data = await response.json();
-        openNotification('error', 'Lỗi', data.message || `Lỗi khi xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'}`);
+        toast.error(data.message || `Lỗi khi xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'}`);
       }
     } catch (error) {
       console.error(`Error deleting ${deleteType}:`, error);
-      openNotification('error', 'Lỗi', `Lỗi khi xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'}. Vui lòng thử lại.`);
+      toast.error(`Lỗi khi xóa ${deleteType === 'category' ? 'danh mục' : 'sản phẩm'}. Vui lòng thử lại.`);
     } finally {
       setIsLoading(false);
       setIsDeleteModalOpen(false);
@@ -325,12 +316,12 @@ const InventoryPage = () => {
     try {
       setIsLoading(true);
       if (!newProduct.name || !newProduct.price || !newProduct.category_id) {
-        openNotification('warning', 'Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+        toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc');
         return;
       }
   
       if (newProduct.manage_stock && (!newProduct.stock_quantity && newProduct.stock_quantity !== 0)) {
-        openNotification('warning', 'Thiếu tồn kho', 'Vui lòng nhập số lượng tồn kho');
+        toast.warning('Vui lòng nhập số lượng tồn kho');
         return;
       }
   
@@ -361,14 +352,14 @@ const InventoryPage = () => {
         resetForm();
         setIsEditMode(false);
         setSelectedProduct(null);
-        openNotification('success', 'Thành công', isEditMode ? 'Cập nhật sản phẩm thành công' : 'Thêm sản phẩm thành công');
+        toast.success(isEditMode ? 'Cập nhật sản phẩm thành công' : 'Thêm sản phẩm thành công');
       } else {
         const data = await response.json();
-        openNotification('error', 'Lỗi', data.message || 'Lỗi khi lưu sản phẩm');
+        toast.error(data.message || 'Lỗi khi lưu sản phẩm');
       }
     } catch (error) {
       console.error('Error saving product:', error);
-      openNotification('error', 'Lỗi', 'Lỗi khi lưu sản phẩm. Vui lòng thử lại.');
+      toast.error('Lỗi khi lưu sản phẩm. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -405,6 +396,18 @@ const InventoryPage = () => {
 
   return (
     <div className="p-6 bg-gray-50/30 min-h-screen">
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Quản lý kho hàng</h1>
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">

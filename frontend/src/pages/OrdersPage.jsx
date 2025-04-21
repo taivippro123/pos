@@ -218,9 +218,9 @@ const OrdersPage = () => {
 
       {/* View Order Modal */}
       {isViewModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-xl m-4">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl my-8 overflow-hidden shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10 flex-shrink-0">
               <h2 className="text-xl font-semibold text-gray-800">Chi tiết đơn hàng #{selectedOrder.order_id}</h2>
               <button
                 onClick={() => setIsViewModalOpen(false)}
@@ -230,8 +230,9 @@ const OrdersPage = () => {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="p-6 flex flex-col flex-grow overflow-hidden">
+              {/* Customer & Order Info - Should not scroll */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 flex-shrink-0">
                 <div className="bg-gray-50/50 rounded-lg p-4">
                   <h3 className="font-medium text-gray-900 mb-3">Thông tin khách hàng</h3>
                   <div className="space-y-2">
@@ -270,37 +271,41 @@ const OrdersPage = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50/50 rounded-lg overflow-hidden">
-                <h3 className="font-medium text-gray-900 p-4 bg-gray-100/50 border-b border-gray-200">
-                  Chi tiết sản phẩm
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {selectedOrder.products?.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50/50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatPrice(item.price)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.quantity}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                            {formatPrice(item.price * item.quantity)}
-                          </td>
+              {/* Product List - Scrollable Area */}
+              <div className="flex-grow overflow-hidden flex flex-col">
+                <div className="bg-gray-50/50 rounded-lg overflow-hidden flex flex-col flex-grow">
+                  <h3 className="font-medium text-gray-900 p-4 bg-gray-100/50 border-b border-gray-200 flex-shrink-0">
+                    Chi tiết sản phẩm
+                  </h3>
+                  <div className="overflow-y-auto flex-grow pb-4">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {selectedOrder.products?.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatPrice(item.price)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.quantity}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                              {formatPrice(item.price * item.quantity)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-gray-50/50 rounded-lg border border-gray-100">
+              {/* Total Amount - Should not scroll */}
+              <div className="mt-6 p-4 bg-gray-50/50 rounded-lg border border-gray-100 flex-shrink-0">
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-medium text-gray-900">Tổng cộng</span>
                   <span className="text-lg font-medium text-blue-600">{formatPrice(selectedOrder.total_amount)}</span>

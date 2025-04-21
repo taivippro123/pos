@@ -1,7 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Key, Users, Pencil, Trash, X, Search } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+// Component for the confirmation toast
+const ConfirmDeleteToast = ({ closeToast, staffId, proceedDelete }) => (
+  <div>
+    <p className="mb-2">Bạn có chắc chắn muốn xóa nhân viên này?</p>
+    <div className="flex justify-end gap-2">
+      <button 
+        onClick={closeToast} 
+        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+      >
+        Hủy
+      </button>
+      <button 
+        onClick={() => {
+          proceedDelete(staffId);
+          closeToast();
+        }} 
+        className="px-3 py-1 text-sm bg-rose-600 text-white rounded hover:bg-rose-700"
+      >
+        Xác nhận
+      </button>
+    </div>
+  </div>
+);
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('staff');
@@ -35,6 +61,11 @@ const SettingsPage = () => {
         ...prev,
         email: user.email
       }));
+    } else {
+      // Handle case where user is not logged in
+      toast.error("Vui lòng đăng nhập để truy cập cài đặt.");
+      // Redirect to login page or handle appropriately
+      // window.location.href = '/login'; 
     }
   }, []);
 
@@ -87,13 +118,14 @@ const SettingsPage = () => {
           password: '',
           role: 'staff'
         });
+        toast.success('Tạo tài khoản nhân viên thành công');
       } else {
         const data = await response.json();
-        alert(data.message || 'Lỗi khi tạo tài khoản nhân viên');
+        toast.error(data.message || 'Lỗi khi tạo tài khoản nhân viên');
       }
     } catch (error) {
       console.error('Error registering staff:', error);
-      alert('Lỗi khi tạo tài khoản nhân viên');
+      toast.error('Lỗi khi tạo tài khoản nhân viên');
     } finally {
       setIsLoading(false);
     }
@@ -105,8 +137,9 @@ const SettingsPage = () => {
       const token = localStorage.getItem('token');
       
       if (!token) {
-        alert('Vui lòng đăng nhập lại');
-        window.location.href = '/login';
+        toast.error('Vui lòng đăng nhập lại');
+        // Consider redirecting or using a more robust auth handling mechanism
+        // window.location.href = '/login';
         return;
       }
 
@@ -122,9 +155,10 @@ const SettingsPage = () => {
       if (!response.ok) {
         const data = await response.json();
         if (response.status === 401) {
-          alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
           localStorage.removeItem('token');
-          window.location.href = '/login';
+          // Consider redirecting or using a more robust auth handling mechanism
+          // window.location.href = '/login';
           return;
         }
         throw new Error(data.message || 'Lỗi khi cập nhật thông tin nhân viên');
@@ -133,55 +167,64 @@ const SettingsPage = () => {
       await fetchStaffList();
       setIsEditModalOpen(false);
       setSelectedStaff(null);
-      alert('Cập nhật thông tin nhân viên thành công');
+      toast.success('Cập nhật thông tin nhân viên thành công');
     } catch (error) {
       console.error('Error updating staff:', error);
-      alert(error.message || 'Lỗi khi cập nhật thông tin nhân viên');
+      toast.error(error.message || 'Lỗi khi cập nhật thông tin nhân viên');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteStaff = async (staffId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
-      try {
-        setIsLoading(true);
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          alert('Vui lòng đăng nhập lại');
-          window.location.href = '/login';
+  // Function to handle the actual deletion logic
+  const proceedWithDelete = async (staffId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('Vui lòng đăng nhập lại');
+        // Consider redirecting
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/users/${staffId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        if (response.status === 401) {
+          toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          localStorage.removeItem('token');
+          // Consider redirecting
           return;
         }
-
-        const response = await fetch(`${API_URL}/users/${staffId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          if (response.status === 401) {
-            alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-            localStorage.removeItem('token');
-            window.location.href = '/login';
-            return;
-          }
-          throw new Error(data.message || 'Lỗi khi xóa nhân viên');
-        }
-
-        await fetchStaffList();
-        alert('Xóa nhân viên thành công');
-      } catch (error) {
-        console.error('Error deleting staff:', error);
-        alert(error.message || 'Lỗi khi xóa nhân viên');
-      } finally {
-        setIsLoading(false);
+        throw new Error(data.message || 'Lỗi khi xóa nhân viên');
       }
+
+      await fetchStaffList();
+      toast.success('Xóa nhân viên thành công');
+    } catch (error) {
+      console.error('Error deleting staff:', error);
+      toast.error(error.message || 'Lỗi khi xóa nhân viên');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleDeleteStaff = (staffId) => {
+    toast(<ConfirmDeleteToast staffId={staffId} proceedDelete={proceedWithDelete} />, {
+      position: "top-center",
+      autoClose: false, // Don't auto close confirmation toasts
+      closeOnClick: false, // Don't close on click
+      draggable: false, // Don't allow dragging
+      closeButton: true // Show a close button
+    });
   };
 
   const handleChangePassword = async () => {
@@ -189,12 +232,12 @@ const SettingsPage = () => {
       setIsLoading(true);
 
       if (!passwordChange.currentPassword || !passwordChange.newPassword || !passwordChange.confirmPassword) {
-        alert('Vui lòng nhập đầy đủ thông tin');
+        toast.warning('Vui lòng nhập đầy đủ thông tin');
         return;
       }
 
       if (passwordChange.newPassword !== passwordChange.confirmPassword) {
-        alert('Mật khẩu mới không khớp');
+        toast.warning('Mật khẩu mới không khớp');
         return;
       }
 
@@ -209,7 +252,7 @@ const SettingsPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Đổi mật khẩu thành công');
+        toast.success('Đổi mật khẩu thành công');
         setPasswordChange({
           email: passwordChange.email, // Giữ nguyên email
           currentPassword: '',
@@ -217,11 +260,11 @@ const SettingsPage = () => {
           confirmPassword: ''
         });
       } else {
-        alert(data.message || 'Lỗi khi đổi mật khẩu');
+        toast.error(data.message || 'Lỗi khi đổi mật khẩu');
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      alert('Lỗi khi đổi mật khẩu. Vui lòng thử lại sau.');
+      toast.error('Lỗi khi đổi mật khẩu. Vui lòng thử lại sau.');
     } finally {
       setIsLoading(false);
     }
@@ -254,6 +297,18 @@ const SettingsPage = () => {
 
   return (
     <div className="p-6 bg-gray-50/30 min-h-screen">
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Cài đặt</h1>
         <div className="flex gap-2">
