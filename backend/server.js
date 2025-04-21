@@ -9,15 +9,14 @@ const crypto = require("crypto");
 const WebSocket = require('ws');
 const dotenv = require('dotenv');
 
-// Load environment variables
+// Load environment variables FIRST
 dotenv.config();
 
-// Configure CORS
+// Configure CORS - Place this BEFORE other app.use() and routes
 const allowedOrigins = [
   'http://localhost:5173', // Allow local development
   'https://pos-gamma-ecru.vercel.app' // Allow your Vercel frontend
 ];
-
 app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl requests)
@@ -31,6 +30,7 @@ app.use(cors({
   credentials: true // Allow cookies if needed
 }));
 
+// Then other middleware
 app.use(express.json());
 
 const db = mysql.createPool({
