@@ -18,7 +18,7 @@ const db = mysql.createPool({
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3,
   queueLimit: 0
 });
 
@@ -1014,7 +1014,7 @@ const keepDBAlive = () => {
 
 // ✅ Gọi các hàm keep-alive khi server start
 keepAlive();
-keepDBAlive();
+// keepDBAlive();
 
 // ✅ Khởi động server
 const PORT = process.env.PORT || 3000;
