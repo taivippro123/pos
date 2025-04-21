@@ -1041,11 +1041,8 @@ app.post("/zalopay/callback", async (req, res) => {
     await db.execute(
       `UPDATE orders o
        JOIN transactions t ON o.id = t.order_id
-       SET o.payment_status = CASE 
-         WHEN t.status = 'success' THEN 'paid'
-         ELSE 'pending'
-       END
-       WHERE t.app_trans_id = ?`,
+       SET o.payment_status = 'paid'
+       WHERE t.app_trans_id = ? AND t.status = 'success'`,
       [app_trans_id]
     );
     
