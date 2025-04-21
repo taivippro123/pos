@@ -104,12 +104,12 @@ const MenuPage = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-screen">
       {/* Search bar */}
       <SearchBar onSearch={handleSearch} />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Product section */}
+        {/* Product section - scrollable */}
         <div className="flex-1 p-6 overflow-y-auto">
           <ProductCategory 
             categories={categories}
@@ -137,8 +137,10 @@ const MenuPage = () => {
           </div>
         </div>
 
-        {/* Order summary */}
-        <OrderSummary />
+        {/* Order summary - fixed */}
+        <div className="w-[400px] border-l border-gray-200">
+          <OrderSummary />
+        </div>
       </div>
     </div>
   );

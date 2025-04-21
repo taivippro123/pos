@@ -4,44 +4,58 @@ import axios from "axios";
 
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
-// Hàm chuyển số thành chữ tiếng Việt (tối ưu cho hàng nghìn)
 const numberToVietnameseWords = (num) => {
-  const ones = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
-  const tens = ["", "mười", "hai mươi", "ba mươi", "bốn mươi", "năm mươi", "sáu mươi", "bảy mươi", "tám mươi", "chín mươi"];
-
-  if (num === 0) return "không";
-
-  let result = "";
-  const thousands = Math.floor(num / 1000);
-  const hundreds = Math.floor((num % 1000) / 100);
-  const tenUnits = num % 100;
-
-  if (thousands > 0) {
-    if (thousands < 10) {
-      result += ones[thousands] + " nghìn ";
-    } else {
-      const t = Math.floor(thousands / 10);
-      const o = thousands % 10;
-      result += tens[t] + (o ? " " + ones[o] : "") + " nghìn ";
+    const ones = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+    const tens = ["", "mười", "hai mươi", "ba mươi", "bốn mươi", "năm mươi", "sáu mươi", "bảy mươi", "tám mươi", "chín mươi"];
+  
+    if (num === 0) return "không";
+  
+    const toWordsBelowThousand = (n) => {
+      let result = "";
+  
+      const hundred = Math.floor(n / 100);
+      const remainder = n % 100;
+      const ten = Math.floor(remainder / 10);
+      const unit = remainder % 10;
+  
+      if (hundred > 0) {
+        result += ones[hundred] + " trăm ";
+        if (remainder > 0 && ten === 0) result += "lẻ ";
+      }
+  
+      if (ten > 1) {
+        result += tens[ten] + (unit ? " " + ones[unit] : "");
+      } else if (ten === 1) {
+        result += "mười" + (unit ? " " + ones[unit] : "");
+      } else if (ten === 0 && unit > 0) {
+        result += ones[unit];
+      }
+  
+      return result.trim();
+    };
+  
+    let result = "";
+    const million = Math.floor(num / 1_000_000);
+    const thousand = Math.floor((num % 1_000_000) / 1_000);
+    const belowThousand = num % 1_000;
+  
+    if (million > 0) {
+      result += toWordsBelowThousand(million) + " triệu ";
     }
-  }
-
-  if (hundreds > 0) {
-    result += ones[hundreds] + " trăm ";
-  }
-
-  if (tenUnits > 0) {
-    if (tenUnits < 10 && hundreds > 0) {
-      result += "lẻ " + ones[tenUnits] + " ";
-    } else {
-      const t = Math.floor(tenUnits / 10);
-      const o = tenUnits % 10;
-      result += tens[t] + (o ? " " + ones[o] : "") + " ";
+  
+    if (thousand > 0) {
+      result += toWordsBelowThousand(thousand) + " nghìn ";
+    } else if (million > 0 && (belowThousand > 0 || thousand === 0)) {
+      result += "không nghìn ";
     }
-  }
-
-  return result.trim();
-};
+  
+    if (belowThousand > 0) {
+      result += toWordsBelowThousand(belowThousand);
+    }
+  
+    return result.trim();
+  };
+  
 
 const speak = async (text) => {
   try {

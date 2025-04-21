@@ -293,7 +293,7 @@ const OrderSummary = () => {
   };
 
   return (
-    <div className="w-[350px] border-l border-gray-200 bg-white p-6 flex flex-col">
+    <div className="w-[350px] border-l border-gray-200 bg-white p-6 flex flex-col h-full">
       <div className="mb-6">
         <div className="space-y-2 mb-4">
           <div className="relative">
