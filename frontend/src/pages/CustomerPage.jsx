@@ -250,7 +250,7 @@ const CustomerPage = () => {
 
             <div className="p-6 max-h-[calc(90vh-80px)] overflow-y-auto">
               <div className="space-y-4">
-                {customerOrders.map((order) => (
+                {customerOrders.slice().reverse().map((order) => (
                   <div key={order.id} className="bg-gray-50/50 rounded-lg p-4 border border-gray-100">
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-medium text-gray-900">Đơn hàng #{order.id}</span>
