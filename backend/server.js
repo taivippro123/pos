@@ -656,16 +656,16 @@ app.get("/report/orders", (req, res) => {
   const overviewQuery = `
     SELECT 
       COUNT(*) AS total_orders,
-      SUM(total_amount) AS total_revenue,
+      SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS total_revenue,
       COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) AS paid_orders,
       COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) AS pending_orders,
       COUNT(CASE WHEN payment_status = 'cancelled' THEN 1 END) AS cancelled_orders,
       SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS paid_revenue,
       SUM(CASE WHEN payment_status = 'pending' THEN total_amount ELSE 0 END) AS pending_revenue,
       COUNT(DISTINCT user_id) AS unique_customers,
-      COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) AS cash_orders,
-      COUNT(CASE WHEN payment_method = 'zalopay' THEN 1 END) AS zalopay_orders,
-      COUNT(CASE WHEN payment_method = 'banking' THEN 1 END) AS banking_orders
+      COUNT(CASE WHEN payment_method = 'cash' AND payment_status = 'paid' THEN 1 END) AS cash_orders,
+      COUNT(CASE WHEN payment_method = 'zalopay' AND payment_status = 'paid' THEN 1 END) AS zalopay_orders,
+      COUNT(CASE WHEN payment_method = 'banking' AND payment_status = 'paid' THEN 1 END) AS banking_orders
     FROM orders
     WHERE created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
@@ -676,15 +676,15 @@ app.get("/report/orders", (req, res) => {
     SELECT 
       DATE(created_at) AS date,
       COUNT(*) AS order_count,
-      SUM(total_amount) AS daily_revenue,
+      SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS daily_revenue,
       COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) AS paid_count,
       COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) AS pending_count,
       COUNT(CASE WHEN payment_status = 'cancelled' THEN 1 END) AS cancelled_count,
       COUNT(DISTINCT user_id) AS unique_customers,
       SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS paid_revenue,
-      COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) AS cash_orders,
-      COUNT(CASE WHEN payment_method = 'zalopay' THEN 1 END) AS zalopay_orders,
-      COUNT(CASE WHEN payment_method = 'banking' THEN 1 END) AS banking_orders
+      COUNT(CASE WHEN payment_method = 'cash' AND payment_status = 'paid' THEN 1 END) AS cash_orders,
+      COUNT(CASE WHEN payment_method = 'zalopay' AND payment_status = 'paid' THEN 1 END) AS zalopay_orders,
+      COUNT(CASE WHEN payment_method = 'banking' AND payment_status = 'paid' THEN 1 END) AS banking_orders
     FROM orders
     WHERE created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
