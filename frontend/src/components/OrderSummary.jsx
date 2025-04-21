@@ -21,6 +21,8 @@ const OrderSummary = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [currentAppTransId, setCurrentAppTransId] = useState(null);
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const handleAddToOrder = (event) => {
@@ -117,7 +119,7 @@ const OrderSummary = () => {
 
   const handlePhoneChange = async (phone) => {
     setCustomerPhone(phone);
-    if (phone.length >= 10) {
+    if (phone.length >= 7) {
       setIsLoading(true);
       try {
         const token = localStorage.getItem("token");
@@ -136,29 +138,40 @@ const OrderSummary = () => {
         }
 
         const users = await response.json();
-        if (users.length > 0 && users[0].phone === phone) {
-          // Khách hàng đã tồn tại
-          setCustomerName(users[0].name);
-          setIsNewCustomer(false);
+        setSuggestedUsers(users);
+        setShowSuggestions(users.length > 0);
+        
+        // Nếu có khách hàng khớp chính xác, tự động chọn
+        const exactMatch = users.find(user => user.phone === phone);
+        if (exactMatch) {
+          handleSelectCustomer(exactMatch);
         } else {
-          // Khách hàng mới
           setCustomerName("");
           setIsNewCustomer(true);
         }
       } catch (error) {
         console.error("Lỗi:", error);
-        alert("Có lỗi xảy ra khi tìm kiếm khách hàng");
-        // Nếu có lỗi, coi như là khách hàng mới
         setCustomerName("");
         setIsNewCustomer(true);
+        setSuggestedUsers([]);
+        setShowSuggestions(false);
       } finally {
         setIsLoading(false);
       }
     } else {
-      // Reset khi số điện thoại chưa đủ 10 số
       setCustomerName("");
       setIsNewCustomer(false);
+      setSuggestedUsers([]);
+      setShowSuggestions(false);
     }
+  };
+
+  const handleSelectCustomer = (user) => {
+    setCustomerName(user.name);
+    setCustomerPhone(user.phone);
+    setIsNewCustomer(false);
+    setSuggestedUsers([]);
+    setShowSuggestions(false);
   };
 
   const handleRemoveItem = (itemId) => {
@@ -359,12 +372,34 @@ const OrderSummary = () => {
               type="text"
               placeholder="Số điện thoại"
               value={customerPhone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 10 && (value === '' || value.startsWith('0'))) {
+                  handlePhoneChange(value);
+                }
+              }}
               className="w-full px-3 py-1 border border-gray-200 rounded-lg text-sm"
+              maxLength={10}
+              pattern="[0-9]*"
+              inputMode="numeric"
             />
             {isLoading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+              </div>
+            )}
+            {showSuggestions && suggestedUsers.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {suggestedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => handleSelectCustomer(user)}
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                  >
+                    <div className="font-medium">{user.name}</div>
+                    <div className="text-gray-500">{user.phone}</div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

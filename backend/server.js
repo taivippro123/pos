@@ -133,8 +133,9 @@ app.get("/users", (req, res) => {
   let params = [];
 
   if (phone) {
-    query += " WHERE phone = ?";
-    params.push(phone);
+    // Tìm kiếm theo số điện thoại bắt đầu bằng số đã nhập
+    query += " WHERE phone LIKE ?";
+    params.push(`${phone}%`);
   }
 
   db.query(query, params, (err, result) => {
