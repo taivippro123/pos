@@ -1,7 +1,7 @@
 // File: server.js
+const cors = require("cors");
 const express = require("express");
 const mysql = require("mysql2");
-const cors = require("cors");
 const app = express();
 const axios = require("axios");
 const moment = require("moment");
@@ -12,23 +12,26 @@ const dotenv = require('dotenv');
 // Load environment variables FIRST
 dotenv.config();
 
-// Configure CORS - Place this BEFORE other app.use() and routes
 const allowedOrigins = [
-  'http://localhost:5173', // Allow local development
-  'https://pos-gamma-ecru.vercel.app' // Allow your Vercel frontend
+  'http://localhost:5173',
+  'https://pos-gamma-ecru.vercel.app'
 ];
+
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      const msg = 'CORS policy does not allow access from this origin.';
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
-  credentials: true // Allow cookies if needed
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'] 
 }));
+
 
 // Then other middleware
 app.use(express.json());
