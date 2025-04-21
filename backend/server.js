@@ -8,7 +8,29 @@ const moment = require("moment");
 const crypto = require("crypto");
 const WebSocket = require('ws');
 const dotenv = require('dotenv');
-app.use(cors());
+
+// Load environment variables
+dotenv.config();
+
+// Configure CORS
+const allowedOrigins = [
+  'http://localhost:5173', // Allow local development
+  'https://pos-gamma-ecru.vercel.app' // Allow your Vercel frontend
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true // Allow cookies if needed
+}));
+
 app.use(express.json());
 
 const db = mysql.createPool({
@@ -21,8 +43,6 @@ const db = mysql.createPool({
   connectionLimit: 3,
   queueLimit: 0
 });
-
-
 
 // Config ZaloPay
 const config = {
