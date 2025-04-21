@@ -14,11 +14,12 @@ import PaymentSuccessTTS from './components/PaymentSuccessTTS'; // hoặc đúng
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Kiểm tra xem có token trong localStorage không
     const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
+    setIsLoading(false);
   }, []);
 
   const handleLogin = () => {
@@ -31,7 +32,6 @@ const App = () => {
     setIsAuthenticated(false);
   };
 
-  // Protected Route component
   const ProtectedRoute = ({ children }) => {
     if (!isAuthenticated) {
       return <Navigate to="/login" />;
@@ -39,7 +39,6 @@ const App = () => {
     return children;
   };
 
-  // Routes configuration
   const routes = [
     { path: '/', element: <MenuPage /> },
     { path: '/orders', element: <OrdersPage /> },
@@ -48,6 +47,8 @@ const App = () => {
     { path: '/report', element: <ReportPage /> },
     { path: '/settings', element: <SettingsPage /> }
   ];
+
+  if (isLoading) return null; // hoặc loading spinner
 
   return (
     <Router>
@@ -62,11 +63,7 @@ const App = () => {
               <Route
                 key={route.path}
                 path={route.path}
-                element={
-                  <ProtectedRoute>
-                    {route.element}
-                  </ProtectedRoute>
-                }
+                element={<ProtectedRoute>{route.element}</ProtectedRoute>}
               />
             ))}
             <Route path="*" element={<Navigate to="/" />} />
@@ -77,5 +74,6 @@ const App = () => {
     </Router>
   );
 };
+
 
 export default App;

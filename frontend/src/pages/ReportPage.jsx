@@ -22,6 +22,8 @@ const ReportPage = () => {
     categoryRevenue: []
   });
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     fetchOrderReport();
   }, []);
@@ -33,6 +35,8 @@ const ReportPage = () => {
       setOrderReport(data);
     } catch (error) {
       console.error('Error fetching order report:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,6 +46,14 @@ const ReportPage = () => {
       currency: 'VND'
     }).format(amount);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50/30">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-300 border-t-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

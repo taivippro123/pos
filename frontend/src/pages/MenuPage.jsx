@@ -89,8 +89,8 @@ const MenuPage = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-500">Đang tải...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50/30">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-300 border-t-blue-600"></div>
       </div>
     );
   }
