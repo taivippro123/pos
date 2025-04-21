@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -17,7 +17,6 @@ const OrderSummary = () => {
   const [zalopayQR, setZalopayQR] = useState(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [currentOrderId, setCurrentOrderId] = useState(null);
@@ -202,10 +201,10 @@ const OrderSummary = () => {
     setIsNewCustomer(false);
     setZalopayQR(null);
     setCurrentOrderId(null);
+    setCurrentAppTransId(null);
     setPaymentMethod('cash');
     setIsLoadingQR(false);
     setIsCancelling(false);
-    setIsUpdating(false);
   };
 
   const handlePlaceOrder = async () => {
@@ -306,51 +305,6 @@ const OrderSummary = () => {
       setCurrentOrderId(null);
     } finally {
       setIsLoadingQR(false);
-    }
-  };
-
-  const handleUpdateOrder = async () => {
-    if (!currentOrderId) return;
-
-    setIsUpdating(true);
-    try {
-      const token = localStorage.getItem("token");
-      const updatedTotal = calculateSubtotal();
-
-      const response = await fetch(`${API_URL}/orders/${currentOrderId}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          total_amount: updatedTotal,
-          note: note,
-          products: orderItems.map(item => ({
-             product_id: item.id,
-             product_name: item.name,
-             quantity: item.quantity,
-             price_at_order: item.price,
-             discount_percent_at_order: item.discount_percent,
-           })),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Không thể cập nhật đơn hàng");
-      }
-
-      setZalopayQR(data.order_url);
-      setCurrentAppTransId(data.app_trans_id);
-      toast.success("Đơn hàng đã được cập nhật. Vui lòng quét mã QR mới.");
-
-    } catch (error) {
-      console.error("Lỗi khi cập nhật đơn hàng:", error);
-      toast.error(error.message || "Có lỗi xảy ra khi cập nhật đơn hàng");
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -501,7 +455,7 @@ const OrderSummary = () => {
       {paymentMethod === "zalopay" && zalopayQR && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg text-center">
           <h3 className="text-sm font-medium text-gray-700 mb-2">
-            Quét mã QR để thanh toán
+            Quét mã QR để thanh toán (Đơn #{currentOrderId})
           </h3>
           <div className="flex justify-center">
             <QRCodeSVG
@@ -525,41 +479,20 @@ const OrderSummary = () => {
         </div>
       )}
 
-      {isUpdating && (
-        <div className="flex justify-center items-center mb-4">
-          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-          <span className="ml-2 text-sm text-gray-600">Đang cập nhật đơn hàng...</span>
-        </div>
-      )}
-
       <div className="mt-auto pt-4 border-t border-gray-100">
         {paymentMethod === 'zalopay' && zalopayQR ? (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={handleUpdateOrder}
-              disabled={isUpdating || isCancelling || orderItems.length === 0}
-              className="bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isUpdating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              Cập nhật đơn hàng #{currentOrderId}
-            </button>
-            <button
-              onClick={handleCancelOrder}
-              disabled={isCancelling || isUpdating}
-              className="bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isCancelling ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <XCircle className="w-4 h-4" />
-              )}
-              Hủy đơn hàng #{currentOrderId}
-            </button>
-          </div>
+          <button
+            onClick={handleCancelOrder}
+            disabled={isCancelling}
+            className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isCancelling ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <XCircle className="w-4 h-4" />
+            )}
+            Hủy đơn hàng #{currentOrderId}
+          </button>
         ) : (
           <button
             onClick={handlePlaceOrder}
