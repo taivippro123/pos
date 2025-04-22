@@ -959,7 +959,7 @@ app.post("/zalopay/create-order", async (req, res) => {
       amount,
       description,
       bank_code: "",
-      callback_url: "https://pos-0s3v.onrender.com/zalopay/callback", 
+      callback_url: "https://pos-gkra.onrender.com/zalopay/callback", 
     };
 
     const dataStr =
