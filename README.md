@@ -7,7 +7,7 @@ A POS (Point of Sale) web application inspired by a beautiful UI concept from [v
 - **Email:** `staff@gmail.com`  
 - **Password:** `123456`
 
-🔗 **Live Demo**: [https://pos-gamma-ecru.vercel.app/](https://pos-gamma-ecru.vercel.app/)
+🔗 **Live Demo**: [https://frontend-theta-two-64.vercel.app/](https://frontend-theta-two-64.vercel.app/)
 
 ---
 
