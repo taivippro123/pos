@@ -1,9 +1,12 @@
 # 🍽️ POS System
 
 A POS (Point of Sale) web application inspired by a beautiful UI concept from [v0.dev](https://v0.dev/community/restaurant-pos-2bo1P6Xaoqg)
-Account demo:
-Email: staff@gmail.com
-Password: 123456
+
+### 🔐 Account Demo
+
+- **Email:** `staff@gmail.com`  
+- **Password:** `123456`
+
 🔗 **Live Demo**: [https://pos-gamma-ecru.vercel.app/](https://pos-gamma-ecru.vercel.app/)
 
 ---
