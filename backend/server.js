@@ -14,6 +14,7 @@ dotenv.config();
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5173/login',
   'https://pos-gamma-ecru.vercel.app'
 ];
 
