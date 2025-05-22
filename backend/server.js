@@ -14,8 +14,8 @@ dotenv.config();
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:5173/login',
-  'https://pos-gamma-ecru.vercel.app'
+  'https://frontend-theta-two-64.vercel.app',
+  'https://frontend-theta-two-64.vercel.app/login'
 ];
 
 app.use(cors({
