@@ -1087,7 +1087,11 @@ function extractDateRangeFromQuestion(question) {
     const lowerQuestion = question.toLowerCase();
     
     // Xử lý "tất cả" hoặc "all time"
-    if (lowerQuestion.includes('tất cả') || lowerQuestion.includes('all time')) {
+    if (lowerQuestion.includes('tất cả') 
+     || lowerQuestion.includes('năm nay') 
+     || lowerQuestion.includes('all time') 
+     || lowerQuestion.includes('tất cả thời gian') 
+     || lowerQuestion.includes('năm qua')) {
       const now = new Date();
       const start = new Date(now.getFullYear(), 0, 1); // Ngày đầu năm hiện tại
       const end = new Date();
