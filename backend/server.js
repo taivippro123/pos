@@ -1082,23 +1082,48 @@ Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu c�
 // ====== Hàm trích xuất ngày từ câu hỏi ======
 function extractDateRangeFromQuestion(question) {
   try {
-    const results = chrono.parse(question, new Date(), { forwardDate: true });
+    const lowerQuestion = question.toLowerCase();
+    
+    // Xử lý "tất cả" hoặc "all time"
+    if (lowerQuestion.includes('tất cả') || lowerQuestion.includes('all time')) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 1); // Ngày đầu năm hiện tại
+      const end = new Date();
+      return {
+        startDate: start.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0],
+      };
+    }
 
+    // Xử lý tháng cụ thể
+    const monthMatch = lowerQuestion.match(/tháng\s*(\d{1,2})/);
+    if (monthMatch) {
+      const monthNum = parseInt(monthMatch[1]) - 1; // Convert to 0-based month
+      const year = new Date().getFullYear();
+      const start = new Date(year, monthNum, 1);
+      const end = new Date(year, monthNum + 1, 0);
+      return {
+        startDate: start.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0],
+      };
+    }
+
+    // Sử dụng chrono để parse các mốc thời gian khác
+    const results = chrono.parse(question, new Date(), { forwardDate: true });
     if (results.length > 0) {
       const result = results[0];
       const startDate = result.start?.date();
       const endDate = result.end?.date() || new Date();
-
       return {
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
       };
     }
 
-    // Nếu không tìm thấy ngày trong câu hỏi, lấy tháng hiện tại
+    // Mặc định: lấy tháng hiện tại
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1); // Ngày đầu tháng
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Ngày cuối tháng
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     return {
       startDate: start.toISOString().split("T")[0],
@@ -1106,10 +1131,10 @@ function extractDateRangeFromQuestion(question) {
     };
   } catch (error) {
     console.error("Error extracting date range:", error);
-    // Fallback: 30 ngày gần nhất
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 30);
+    // Fallback: tháng hiện tại
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     return {
       startDate: start.toISOString().split("T")[0],
