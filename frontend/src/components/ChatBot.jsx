@@ -131,40 +131,40 @@ const ChatBot = () => {
   return (
     <div className="fixed bottom-4 left-4 z-50">
       {open ? (
-        <div className="bg-white shadow-xl border border-gray-300 rounded-lg w-96 flex flex-col h-[600px]">
+        <div className="bg-white shadow-lg border border-gray-100 rounded-2xl w-96 flex flex-col h-[600px] overflow-hidden">
           {/* Header */}
-          <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="font-bold text-lg">Trợ lý AI</h2>
+          <div className="flex justify-between items-center px-5 py-4 bg-white">
+            <h2 className="font-semibold text-lg text-gray-800">Trợ lý AI</h2>
             <button 
               onClick={toggleChat}
-              className="text-gray-500 hover:text-black p-1 rounded hover:bg-gray-100"
+              className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-50 transition-colors"
             >
               ✕
             </button>
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50">
             {messages.map((msg, index) => (
               <div
                 key={index}
                 className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
                     msg.type === 'user'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-500 text-white'
                       : msg.type === 'error'
-                      ? 'bg-rose-100 text-rose-600 border border-rose-200'
-                      : 'bg-gray-100 text-gray-800'
+                      ? 'bg-rose-50 text-rose-500 border border-rose-100'
+                      : 'bg-white text-gray-700'
                   }`}
                 >
                   <div 
-                    className="text-sm whitespace-pre-wrap"
+                    className="text-sm whitespace-pre-wrap leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: formatBoldText(msg.content) }}
                   />
-                  <div className={`text-xs mt-1 ${
-                    msg.type === 'user' ? 'text-blue-100' : 'text-gray-500'
+                  <div className={`text-xs mt-1.5 ${
+                    msg.type === 'user' ? 'text-blue-100' : 'text-gray-400'
                   }`}>
                     {formatTime(msg.timestamp)}
                   </div>
@@ -175,10 +175,10 @@ const ChatBot = () => {
           </div>
 
           {/* Input Area */}
-          <div className="border-t p-4">
+          <div className="p-4 bg-white">
             <div className="relative">
               <textarea
-                className="w-full border rounded-lg p-3 pr-24 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 resize-none"
+                className="w-full border border-gray-200 rounded-xl p-3 pr-24 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 resize-none bg-gray-50"
                 rows={2}
                 placeholder="Nhập câu hỏi... (Nhấn Enter để gửi)"
                 value={question}
@@ -191,10 +191,10 @@ const ChatBot = () => {
               <button
                 onClick={askAI}
                 disabled={loading}
-                className={`absolute right-2 bottom-2 px-4 py-1 text-white text-sm rounded transition-all ${
+                className={`absolute right-2 bottom-2 px-4 py-1.5 text-white text-sm rounded-lg transition-all ${
                   loading
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
                 }`}
               >
                 {loading ? 'Đang gửi...' : 'Gửi'}
@@ -205,7 +205,7 @@ const ChatBot = () => {
       ) : (
         <button
           onClick={toggleChat}
-          className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg text-sm transition-all"
+          className="bg-blue-500 hover:bg-blue-600 text-white p-3.5 rounded-full shadow-lg text-lg transition-all hover:scale-110"
         >
           🤖
         </button>

@@ -31,7 +31,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'] 
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 
@@ -115,7 +115,7 @@ app.post("/login", (req, res) => {
     const user = results[0];
     // Tạo token ngẫu nhiên
     const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    
+
     res.json({
       message: "Đăng nhập thành công",
       user: {
@@ -198,10 +198,10 @@ app.delete("/products/:id", (req, res) => {
     [productId],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Lỗi khi kiểm tra sản phẩm" });
-      
+
       if (result[0].count > 0) {
-        return res.status(400).json({ 
-          message: "Không thể xóa sản phẩm vì đã có trong đơn hàng" 
+        return res.status(400).json({
+          message: "Không thể xóa sản phẩm vì đã có trong đơn hàng"
         });
       }
 
@@ -318,7 +318,7 @@ app.post("/orders", (req, res) => {
               if (manageStock && productInfo.stock_quantity < product.quantity) {
                 reject(new Error(`Sản phẩm ${product.product_name} không đủ số lượng tồn kho`));
               } else {
-                resolve({...productInfo, manage_stock: manageStock});
+                resolve({ ...productInfo, manage_stock: manageStock });
               }
             }
           }
@@ -330,31 +330,31 @@ app.post("/orders", (req, res) => {
       .then((productInfos) => {
         // 2. Tạo đơn hàng
         const orderQuery = `INSERT INTO orders (user_id, total_amount, payment_method, payment_status, note) VALUES (?, ?, ?, ?, ?)`;
-    db.query(
-      orderQuery,
+        db.query(
+          orderQuery,
           [user_id, total_amount, payment_method, payment_status, note],
-      (err, orderResult) => {
-        if (err)
-          return res
-            .status(500)
-            .json({ message: "Lỗi tạo đơn hàng", error: err });
+          (err, orderResult) => {
+            if (err)
+              return res
+                .status(500)
+                .json({ message: "Lỗi tạo đơn hàng", error: err });
 
-        const orderId = orderResult.insertId;
-        const details = products.map((p) => [
-          orderId,
-          p.product_id,
-          p.product_name,
-          p.quantity,
-          p.price_at_order,
-          p.discount_percent_at_order,
-        ]);
+            const orderId = orderResult.insertId;
+            const details = products.map((p) => [
+              orderId,
+              p.product_id,
+              p.product_name,
+              p.quantity,
+              p.price_at_order,
+              p.discount_percent_at_order,
+            ]);
 
-        const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
-        db.query(detailQuery, [details], (err2) => {
-          if (err2)
-            return res
-              .status(500)
-              .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
+            const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
+            db.query(detailQuery, [details], (err2) => {
+              if (err2)
+                return res
+                  .status(500)
+                  .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
 
               // 3. Cập nhật số lượng tồn kho trong bảng products
               const updateStockPromises = products.map((product, index) => {
@@ -386,14 +386,14 @@ app.post("/orders", (req, res) => {
                         return res.status(500).json({ message: "Lỗi lấy thông tin sản phẩm", error: err });
                       }
 
-          res.json({
-            message: "Tạo đơn hàng thành công",
-            orderId,
-            user: {
-              id: user_id,
-              name: user_name,
-              phone,
-            },
+                      res.json({
+                        message: "Tạo đơn hàng thành công",
+                        orderId,
+                        user: {
+                          id: user_id,
+                          name: user_name,
+                          phone,
+                        },
                         updatedProducts: updatedProducts.map(p => ({
                           id: p.id,
                           name: p.name,
@@ -406,10 +406,10 @@ app.post("/orders", (req, res) => {
                 })
                 .catch(err => {
                   res.status(500).json({ message: "Lỗi cập nhật tồn kho", error: err });
-          });
-        });
-      }
-    );
+                });
+            });
+          }
+        );
       })
       .catch(err => {
         res.status(400).json({ message: err.message });
@@ -540,7 +540,7 @@ app.put("/orders/:id/cancel", async (req, res) => {
 
     // 1. Kiểm tra trạng thái đơn hàng hiện tại
     const [orderRows] = await connection.query(
-      "SELECT payment_status FROM orders WHERE id = ?", 
+      "SELECT payment_status FROM orders WHERE id = ?",
       [orderId]
     );
 
@@ -771,21 +771,21 @@ app.get("/report/orders", (req, res) => {
       });
     })
   ])
-  .then(([overview, dailyRevenue, topProducts, categoryRevenue]) => {
-    res.json({
-      overview,
-      dailyRevenue,
-      topProducts,
-      categoryRevenue
+    .then(([overview, dailyRevenue, topProducts, categoryRevenue]) => {
+      res.json({
+        overview,
+        dailyRevenue,
+        topProducts,
+        categoryRevenue
+      });
+    })
+    .catch(err => {
+      console.error("Report Error:", err);
+      res.status(500).json({
+        message: "Lỗi khi lấy báo cáo đơn hàng",
+        error: err
+      });
     });
-  })
-  .catch(err => {
-    console.error("Report Error:", err);
-    res.status(500).json({ 
-      message: "Lỗi khi lấy báo cáo đơn hàng", 
-      error: err 
-    });
-  });
 });
 
 
@@ -811,9 +811,9 @@ app.post("/categories", (req, res) => {
     [name, description],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Lỗi khi thêm category" });
-      res.json({ 
+      res.json({
         message: "Thêm category thành công",
-        categoryId: result.insertId 
+        categoryId: result.insertId
       });
     }
   );
@@ -829,10 +829,10 @@ app.delete("/categories/:id", (req, res) => {
     [categoryId],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Lỗi khi kiểm tra category" });
-      
+
       if (result[0].count > 0) {
-        return res.status(400).json({ 
-          message: "Không thể xóa category vì vẫn còn sản phẩm thuộc category này" 
+        return res.status(400).json({
+          message: "Không thể xóa category vì vẫn còn sản phẩm thuộc category này"
         });
       }
 
@@ -936,7 +936,7 @@ app.post("/change-password", (req, res) => {
     if (user.password !== currentPassword) {
       return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
     }
-    
+
     // Cập nhật mật khẩu mới
     db.query("UPDATE users SET password = ? WHERE id = ?", [newPassword, user.id], (err) => {
       if (err) return res.status(500).json({ message: "Lỗi đổi mật khẩu" });
@@ -965,7 +965,7 @@ app.post("/zalopay/create-order", async (req, res) => {
       amount,
       description,
       bank_code: "",
-      callback_url: "https://pos-gkra.onrender.com/zalopay/callback", 
+      callback_url: "https://pos-gkra.onrender.com/zalopay/callback",
     };
 
     const dataStr =
@@ -1052,7 +1052,7 @@ app.post("/zalopay/callback", async (req, res) => {
        WHERE t.app_trans_id = ? AND t.status = 'success'`,
       [app_trans_id]
     );
-    
+
     return res.json({ return_code: 1, return_message: "OK" });
 
   } catch (err) {
@@ -1218,29 +1218,29 @@ app.get("/report/analytics", (req, res) => {
       });
     })
   ])
-  .then(([revenue, inventory, profit, time, customer]) => {
-    res.json({
-      ...revenue,
-      ...inventory,
-      ...profit,
-      ...time,
-      ...customer,
-      metadata: {
-        period: {
-          start: startDate,
-          end: endDate
-        },
-        generated_at: new Date()
-      }
+    .then(([revenue, inventory, profit, time, customer]) => {
+      res.json({
+        ...revenue,
+        ...inventory,
+        ...profit,
+        ...time,
+        ...customer,
+        metadata: {
+          period: {
+            start: startDate,
+            end: endDate
+          },
+          generated_at: new Date()
+        }
+      });
+    })
+    .catch(err => {
+      console.error("Analytics Error:", err);
+      res.status(500).json({
+        message: "Lỗi khi phân tích dữ liệu",
+        error: err
+      });
     });
-  })
-  .catch(err => {
-    console.error("Analytics Error:", err);
-    res.status(500).json({ 
-      message: "Lỗi khi phân tích dữ liệu", 
-      error: err 
-    });
-  });
 });
 
 
@@ -1257,7 +1257,6 @@ Quy tắc trả lời:
    - Tần suất mua hàng (thời gian giữa các đơn)
    - Trạng thái thanh toán của đơn hàng
    - Thời gian từ lần mua đầu đến gần nhất
-
 4. Khi trả lời về khách hàng, cần bao gồm:
    - Tên và số điện thoại của khách
    - Chi tiết lịch sử mua hàng (số đơn, tổng giá trị, trạng thái)
@@ -1266,12 +1265,23 @@ Quy tắc trả lời:
      + Khách tiềm năng: 2-3 đơn hoặc tổng 50.000đ-100.000đ
      + Khách mới: 1 đơn hoặc tổng < 50.000đ
 
-5. Nếu có dữ liệu, trả lời theo cấu trúc:
-   - Phân tích ngắn gọn tình hình
-   - Đề xuất hành động cụ thể
-   - (Tùy chọn) Đề xuất bổ sung thêm dữ liệu nếu cần
 
-Ví dụ cách trả lời tốt:
+Quy tắc tính toán doanh thu:
+1. Chỉ tính doanh thu từ các đơn hàng có trạng thái "paid"
+2. Không tính các đơn hàng "pending" hoặc "cancelled"
+3. Khi tính tổng doanh thu:
+   - Kiểm tra từng giao dịch có hợp lệ không
+   - Chỉ cộng dồn các số tiền > 0
+   - Format số tiền theo chuẩn VNĐ
+
+4. Khi phân tích theo thời gian:
+   - Chỉ phân tích từ ngày có dữ liệu đầu tiên
+   - Nếu không có dữ liệu trong khoảng thời gian, trả lời "Không có doanh thu"
+   - Nêu rõ số lượng đơn hàng đã thanh toán/chưa thanh toán/hủy
+
+5. Khi so sánh doanh thu:
+   - So sánh cùng kỳ chỉ khi có dữ liệu của cả 2 kỳ
+   - Nêu rõ "không thể so sánh" nếu thiếu dữ liệu kỳ trước
 "Dựa trên dữ liệu mua hàng, có thể phân loại khách hàng như sau:
 
 Khách hàng thân thiết:
@@ -1284,9 +1294,18 @@ Khách hàng thân thiết:
 1. Liên hệ nhắc thanh toán 2 đơn pending
 2. Gửi ưu đãi đặc biệt cho khách thân thiết
 
+Ví dụ cách trả lời tốt:
+"Phân tích doanh thu tháng 5/2025:
+- Tổng doanh thu: 165.000 đồng
+- Số đơn hàng: 8 đơn
+  + Đã thanh toán: 6 đơn
+  + Chờ thanh toán: 1 đơn
+  + Đã hủy: 1 đơn
 Để tối ưu chương trình, cần bổ sung thêm:
 - Thông tin sản phẩm đã mua
 - Phản hồi của khách hàng"
+Không thể so sánh với tháng 5/2024 do chưa có dữ liệu."
+
 
 Quy tắc xử lý thời gian và hiển thị số tiền giữ nguyên như cũ...
 
@@ -1323,13 +1342,13 @@ Trả lời bằng tiếng Việt, thân thiện, dễ hiểu, tập trung vào 
 function extractDateRangeFromQuestion(question) {
   try {
     const lowerQuestion = question.toLowerCase();
-    
+
     // Xử lý "tất cả" hoặc "all time"
-    if (lowerQuestion.includes('tất cả') 
-     || lowerQuestion.includes('năm nay') 
-     || lowerQuestion.includes('all time') 
-     || lowerQuestion.includes('tất cả thời gian') 
-     || lowerQuestion.includes('năm qua')) {
+    if (lowerQuestion.includes('tất cả')
+      || lowerQuestion.includes('năm nay')
+      || lowerQuestion.includes('all time')
+      || lowerQuestion.includes('tất cả thời gian')
+      || lowerQuestion.includes('năm qua')) {
       const now = new Date();
       const start = new Date(now.getFullYear(), 0, 1); // Ngày đầu năm hiện tại
       const end = new Date();
@@ -1405,16 +1424,16 @@ app.post("/ask-ai", async (req, res) => {
   try {
     const { question } = req.body;
     if (!question || typeof question !== 'string') {
-      return res.status(400).json({ 
-        error: "Vui lòng nhập câu hỏi hợp lệ" 
+      return res.status(400).json({
+        error: "Vui lòng nhập câu hỏi hợp lệ"
       });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error("Missing GEMINI_API_KEY");
-      return res.status(500).json({ 
-        error: "Chưa cấu hình API key cho AI" 
+      return res.status(500).json({
+        error: "Chưa cấu hình API key cho AI"
       });
     }
 
@@ -1443,7 +1462,7 @@ app.post("/ask-ai", async (req, res) => {
       // For each customer in usersRes.data, fetch their orders
       const customerOrdersPromises = usersRes.data
         .filter(user => user.role === 'customer')
-        .map(customer => 
+        .map(customer =>
           axios.get(`${process.env.API_URL}/users/${customer.id}/orders`, {
             timeout: 10000
           }).catch(err => {
@@ -1453,7 +1472,7 @@ app.post("/ask-ai", async (req, res) => {
         );
 
       const customerOrdersResponses = await Promise.all(customerOrdersPromises);
-      
+
       // Combine all data
       const combinedData = {
         orders: reportOrdersRes.data,
@@ -1479,9 +1498,9 @@ Câu hỏi: ${question}
       `.trim();
 
       const payload = {
-        contents: [{ 
-          role: "user", 
-          parts: [{ text: prompt }] 
+        contents: [{
+          role: "user",
+          parts: [{ text: prompt }]
         }]
       };
 
@@ -1501,8 +1520,8 @@ Câu hỏi: ${question}
     } catch (error) {
       console.error("Error fetching data:", error);
       if (error.response?.status === 404) {
-        return res.status(404).json({ 
-          error: "Không tìm thấy dữ liệu cho khoảng thời gian này" 
+        return res.status(404).json({
+          error: "Không tìm thấy dữ liệu cho khoảng thời gian này"
         });
       }
       throw error;
@@ -1510,10 +1529,10 @@ Câu hỏi: ${question}
 
   } catch (error) {
     console.error("Error in /ask-ai:", error);
-    const errorMessage = error.response?.data?.error || 
-                        error.message || 
-                        "Lỗi xử lý yêu cầu. Vui lòng thử lại sau.";
-    
+    const errorMessage = error.response?.data?.error ||
+      error.message ||
+      "Lỗi xử lý yêu cầu. Vui lòng thử lại sau.";
+
     return res.status(500).json({ error: errorMessage });
   }
 });
@@ -1534,7 +1553,7 @@ app.get("/ping", (req, res) => {
 
 // ✅ Hàm giữ app luôn sống bằng cách ping chính nó
 const keepAlive = () => {
-  const URL = "https://pos-0s3v.onrender.com/"; 
+  const URL = "https://pos-0s3v.onrender.com/";
 
   setInterval(() => {
     axios.get(`${URL}/ping`)
