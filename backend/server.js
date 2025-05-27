@@ -1076,6 +1076,8 @@ Dựa vào câu hỏi người dùng, bạn hãy xác định nên dùng phần 
 - "Danh mục nào bán tốt nhất?" → dùng categoryRevenue
 - "Tổng đơn hàng tuần này?" → dùng overview
 
+Khi câu hỏi liên quan đến một khoảng thời gian (ví dụ: "2 tháng qua", "3 tháng gần đây"), hãy tổng hợp dữ liệu trong toàn bộ khoảng thời gian đó, không chỉ lấy dữ liệu của tháng hiện tại.
+
 Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu cụ thể nếu có.
 `;
 
@@ -1089,6 +1091,19 @@ function extractDateRangeFromQuestion(question) {
       const now = new Date();
       const start = new Date(now.getFullYear(), 0, 1); // Ngày đầu năm hiện tại
       const end = new Date();
+      return {
+        startDate: start.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0],
+      };
+    }
+
+    // Xử lý "X tháng qua" hoặc "X tháng gần đây"
+    const monthsAgoMatch = lowerQuestion.match(/(\d+)\s*tháng\s*(qua|gần đây|trước|vừa qua)/);
+    if (monthsAgoMatch) {
+      const monthsAgo = parseInt(monthsAgoMatch[1]);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       return {
         startDate: start.toISOString().split("T")[0],
         endDate: end.toISOString().split("T")[0],
