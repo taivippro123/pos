@@ -1250,22 +1250,45 @@ Bạn là một trợ lý phân tích dữ liệu bán hàng thông minh, giúp 
 
 Quy tắc trả lời:
 1. KHÔNG BAO GIỜ đề cập đến thông tin kỹ thuật như API, endpoint, query, database.
-2. Nếu thiếu dữ liệu để trả lời, hãy nói rõ "Hiện tại chưa có đủ dữ liệu về [loại dữ liệu] để trả lời câu hỏi này."
-3. Nếu có dữ liệu, trả lời theo cấu trúc:
+2. Nếu thiếu dữ liệu để trả lời, hãy nêu rõ "Hiện tại chưa có đủ dữ liệu về [loại dữ liệu] để trả lời câu hỏi này."
+3. Với câu hỏi về khách hàng thân thiết, phân tích dựa trên:
+   - Tổng số đơn hàng của khách
+   - Tổng giá trị các đơn hàng
+   - Tần suất mua hàng (thời gian giữa các đơn)
+   - Trạng thái thanh toán của đơn hàng
+   - Thời gian từ lần mua đầu đến gần nhất
+
+4. Khi trả lời về khách hàng, cần bao gồm:
+   - Tên và số điện thoại của khách
+   - Chi tiết lịch sử mua hàng (số đơn, tổng giá trị, trạng thái)
+   - Đánh giá mức độ thân thiết dựa trên:
+     + Khách thân thiết: > 3 đơn hoặc tổng > 100.000đ
+     + Khách tiềm năng: 2-3 đơn hoặc tổng 50.000đ-100.000đ
+     + Khách mới: 1 đơn hoặc tổng < 50.000đ
+
+5. Nếu có dữ liệu, trả lời theo cấu trúc:
    - Phân tích ngắn gọn tình hình
    - Đề xuất hành động cụ thể
    - (Tùy chọn) Đề xuất bổ sung thêm dữ liệu nếu cần
 
 Ví dụ cách trả lời tốt:
-"Hiện tại chưa có đủ dữ liệu về tồn kho để đưa ra đề xuất chính xác. Tuy nhiên, dựa trên doanh số bán hàng:
-- Trà đào là sản phẩm bán chạy nhất với doanh thu 1.200.000 đồng
-- Đồ uống chiếm 70% doanh thu
+"Dựa trên dữ liệu mua hàng, có thể phân loại khách hàng như sau:
+
+Khách hàng thân thiết:
+- Anh Thành Tài (0356882700):
+  + 3 đơn hàng, tổng 35.000đ
+  + Mua hàng đều đặn từ 20/4/2025
+  + 1 đơn đã thanh toán, 2 đơn đang chờ
 
 Đề xuất hành động:
-1. Ưu tiên theo dõi tồn kho trà đào
-2. Xem xét chương trình khuyến mãi cho đồ ăn
+1. Liên hệ nhắc thanh toán 2 đơn pending
+2. Gửi ưu đãi đặc biệt cho khách thân thiết
 
-Để có đề xuất chính xác hơn, cần bổ sung thêm dữ liệu về tồn kho của từng sản phẩm."
+Để tối ưu chương trình, cần bổ sung thêm:
+- Thông tin sản phẩm đã mua
+- Phản hồi của khách hàng"
+
+Quy tắc xử lý thời gian và hiển thị số tiền giữ nguyên như cũ...
 
 Quy tắc xử lý thời gian:
 1. Khi nói về "tuần sau", "tháng sau":
@@ -1380,7 +1403,6 @@ function extractDateRangeFromQuestion(question) {
 // ========== API /ask-ai ==========
 app.post("/ask-ai", async (req, res) => {
   try {
-    // Validate request
     const { question } = req.body;
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ 
@@ -1388,7 +1410,6 @@ app.post("/ask-ai", async (req, res) => {
       });
     }
 
-    // Validate API key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error("Missing GEMINI_API_KEY");
@@ -1397,32 +1418,66 @@ app.post("/ask-ai", async (req, res) => {
       });
     }
 
-    // Extract date range
     const { startDate, endDate } = extractDateRangeFromQuestion(question);
     console.log(`Date range: ${startDate} to ${endDate}`);
 
-    // Get report data
     try {
-      const reportRes = await axios.get(`${process.env.API_URL}/report/orders`, {
-        params: { startDate, endDate },
-        timeout: 10000 // 10 second timeout
-      });
+      // Fetch data from multiple endpoints in parallel
+      const [reportOrdersRes, revenueRes, analyticsRes, usersRes] = await Promise.all([
+        axios.get(`${process.env.API_URL}/report/orders`, {
+          params: { startDate, endDate },
+          timeout: 10000
+        }),
+        axios.get(`${process.env.API_URL}/report/revenue`, {
+          timeout: 10000
+        }),
+        axios.get(`${process.env.API_URL}/report/analytics`, {
+          params: { startDate, endDate },
+          timeout: 10000
+        }),
+        axios.get(`${process.env.API_URL}/users`, {
+          timeout: 10000
+        })
+      ]);
 
-      const reportData = reportRes.data;
+      // For each customer in usersRes.data, fetch their orders
+      const customerOrdersPromises = usersRes.data
+        .filter(user => user.role === 'customer')
+        .map(customer => 
+          axios.get(`${process.env.API_URL}/users/${customer.id}/orders`, {
+            timeout: 10000
+          }).catch(err => {
+            console.warn(`Failed to fetch orders for customer ${customer.id}:`, err.message);
+            return { data: [] };
+          })
+        );
 
-      // Prepare prompt
+      const customerOrdersResponses = await Promise.all(customerOrdersPromises);
+      
+      // Combine all data
+      const combinedData = {
+        orders: reportOrdersRes.data,
+        revenue: revenueRes.data,
+        analytics: analyticsRes.data,
+        customers: usersRes.data
+          .filter(user => user.role === 'customer')
+          .map((customer, index) => ({
+            ...customer,
+            orders: customerOrdersResponses[index].data || []
+          }))
+      };
+
       const prompt = `
 ${API_CONTEXT}
 
 Khoảng thời gian: từ ${startDate} đến ${endDate}
 
-Dữ liệu:
-${JSON.stringify(reportData, null, 2)}
+Dữ liệu tổng hợp:
+${JSON.stringify(combinedData, null, 2)}
 
 Câu hỏi: ${question}
       `.trim();
 
-      // Call Gemini API
       const payload = {
         contents: [{ 
           role: "user", 
@@ -1433,10 +1488,9 @@ Câu hỏi: ${question}
       const geminiRes = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         payload,
-        { timeout: 15000 } // 15 second timeout
+        { timeout: 15000 }
       );
 
-      // Extract and validate AI response
       const aiReply = geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!aiReply) {
         throw new Error("Không nhận được phản hồi hợp lệ từ AI");
@@ -1445,13 +1499,13 @@ Câu hỏi: ${question}
       return res.json({ reply: aiReply });
 
     } catch (error) {
-      console.error("Error fetching report data:", error);
+      console.error("Error fetching data:", error);
       if (error.response?.status === 404) {
         return res.status(404).json({ 
-          error: "Không tìm thấy dữ liệu báo cáo cho khoảng thời gian này" 
+          error: "Không tìm thấy dữ liệu cho khoảng thời gian này" 
         });
       }
-      throw error; // Let the outer catch handle other errors
+      throw error;
     }
 
   } catch (error) {
