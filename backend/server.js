@@ -695,7 +695,7 @@ app.get("/report/orders", (req, res) => {
     ORDER BY date DESC
   `;
 
-  // Query top sản phẩm bán chạy
+  // Query top sản phẩm bán chạy - Sửa lại cách tính doanh thu
   const topProductsQuery = `
     SELECT 
       od.product_id,
@@ -703,7 +703,9 @@ app.get("/report/orders", (req, res) => {
       p.category_id,
       c.name AS category_name,
       SUM(od.quantity) AS total_quantity,
-      SUM(od.quantity * od.price_at_order) AS total_revenue,
+      SUM(
+        od.quantity * od.price_at_order * (1 - IFNULL(od.discount_percent_at_order, 0) / 100)
+      ) AS total_revenue,
       AVG(od.price_at_order) AS avg_price,
       AVG(od.discount_percent_at_order) AS avg_discount,
       COUNT(DISTINCT od.order_id) AS order_count
@@ -715,17 +717,19 @@ app.get("/report/orders", (req, res) => {
     AND IFNULL(?, NOW())
     AND o.payment_status = 'paid'
     GROUP BY od.product_id, od.product_name, p.category_id, c.name
-    ORDER BY total_quantity DESC
+    ORDER BY total_revenue DESC
     LIMIT 10
   `;
 
-  // Query doanh thu theo danh mục
+  // Query doanh thu theo danh mục - Sửa lại cách tính doanh thu
   const categoryRevenueQuery = `
     SELECT 
       c.id AS category_id,
       c.name AS category_name,
       SUM(od.quantity) AS total_quantity,
-      SUM(od.quantity * od.price_at_order) AS total_revenue,
+      SUM(
+        od.quantity * od.price_at_order * (1 - IFNULL(od.discount_percent_at_order, 0) / 100)
+      ) AS total_revenue,
       AVG(od.price_at_order) AS avg_price,
       COUNT(DISTINCT o.id) AS order_count,
       COUNT(DISTINCT o.user_id) AS customer_count
@@ -1058,25 +1062,192 @@ app.post("/zalopay/callback", async (req, res) => {
 });
 
 
+// API BÁO CÁO NÂNG CAO
+app.get("/report/analytics", (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  // 1. Phân tích xu hướng doanh thu
+  const revenueAnalysisQuery = `
+    SELECT 
+      DATE(created_at) as date,
+      SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) as revenue,
+      COUNT(*) as order_count,
+      AVG(total_amount) as avg_order_value,
+      DAYNAME(created_at) as day_of_week,
+      HOUR(created_at) as hour_of_day
+    FROM orders 
+    WHERE created_at BETWEEN ? AND ?
+    GROUP BY DATE(created_at), DAYNAME(created_at), HOUR(created_at)
+    ORDER BY date ASC
+  `;
+
+  // 2. Phân tích tồn kho và xu hướng tiêu thụ
+  const inventoryAnalysisQuery = `
+    SELECT 
+      p.id,
+      p.name,
+      p.stock_quantity as current_stock,
+      p.price,
+      c.name as category,
+      COALESCE(SUM(od.quantity), 0) as total_sold,
+      COALESCE(AVG(od.quantity), 0) as avg_daily_sold,
+      DATEDIFF(NOW(), MAX(o.created_at)) as days_since_last_sale,
+      p.stock_quantity / NULLIF(AVG(od.quantity), 0) as days_of_inventory_left
+    FROM products p
+    LEFT JOIN order_details od ON p.id = od.product_id
+    LEFT JOIN orders o ON od.order_id = o.id AND o.payment_status = 'paid'
+    LEFT JOIN categories c ON p.category_id = c.id
+    WHERE (o.created_at BETWEEN ? AND ?) OR o.created_at IS NULL
+    GROUP BY p.id, p.name, p.stock_quantity, p.price, c.name
+  `;
+
+  // 3. Phân tích lợi nhuận và hiệu quả chiết khấu
+  const profitAnalysisQuery = `
+    SELECT 
+      p.id,
+      p.name,
+      p.price as original_price,
+      AVG(od.discount_percent_at_order) as avg_discount,
+      COUNT(DISTINCT o.id) as number_of_orders,
+      COUNT(DISTINCT CASE WHEN od.discount_percent_at_order > 0 THEN o.id END) as discounted_orders,
+      SUM(od.quantity) as total_quantity,
+      SUM(od.quantity * od.price_at_order) as revenue_before_discount,
+      SUM(od.quantity * od.price_at_order * (1 - IFNULL(od.discount_percent_at_order, 0) / 100)) as revenue_after_discount,
+      AVG(CASE WHEN od.discount_percent_at_order > 0 
+          THEN od.quantity 
+          ELSE NULL 
+      END) as avg_quantity_when_discounted
+    FROM products p
+    LEFT JOIN order_details od ON p.id = od.product_id
+    LEFT JOIN orders o ON od.order_id = o.id AND o.payment_status = 'paid'
+    WHERE o.created_at BETWEEN ? AND ?
+    GROUP BY p.id, p.name, p.price
+  `;
+
+  // 4. Phân tích thời điểm bán hàng
+  const timeAnalysisQuery = `
+    SELECT 
+      HOUR(created_at) as hour,
+      DAYNAME(created_at) as day,
+      COUNT(*) as order_count,
+      SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) as revenue,
+      COUNT(DISTINCT user_id) as unique_customers
+    FROM orders
+    WHERE created_at BETWEEN ? AND ?
+    GROUP BY HOUR(created_at), DAYNAME(created_at)
+    ORDER BY DAYOFWEEK(created_at), HOUR(created_at)
+  `;
+
+  // 5. Phân tích hành vi khách hàng
+  const customerAnalysisQuery = `
+    SELECT 
+      u.id,
+      u.name,
+      COUNT(o.id) as total_orders,
+      SUM(o.total_amount) as total_spent,
+      AVG(o.total_amount) as avg_order_value,
+      MAX(o.created_at) as last_order_date,
+      GROUP_CONCAT(DISTINCT p.category_id) as preferred_categories,
+      COUNT(DISTINCT p.category_id) as category_count
+    FROM users u
+    LEFT JOIN orders o ON u.id = o.user_id AND o.payment_status = 'paid'
+    LEFT JOIN order_details od ON o.id = od.order_id
+    LEFT JOIN products p ON od.product_id = p.id
+    WHERE o.created_at BETWEEN ? AND ?
+    GROUP BY u.id, u.name
+    HAVING total_orders > 0
+    ORDER BY total_spent DESC
+  `;
+
+  // Thực hiện các query song song
+  Promise.all([
+    new Promise((resolve, reject) => {
+      db.query(revenueAnalysisQuery, [startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve({ revenueAnalysis: result });
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(inventoryAnalysisQuery, [startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve({ inventoryAnalysis: result });
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(profitAnalysisQuery, [startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve({ profitAnalysis: result });
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(timeAnalysisQuery, [startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve({ timeAnalysis: result });
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(customerAnalysisQuery, [startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve({ customerAnalysis: result });
+      });
+    })
+  ])
+  .then(([revenue, inventory, profit, time, customer]) => {
+    res.json({
+      ...revenue,
+      ...inventory,
+      ...profit,
+      ...time,
+      ...customer,
+      metadata: {
+        period: {
+          start: startDate,
+          end: endDate
+        },
+        generated_at: new Date()
+      }
+    });
+  })
+  .catch(err => {
+    console.error("Analytics Error:", err);
+    res.status(500).json({ 
+      message: "Lỗi khi phân tích dữ liệu", 
+      error: err 
+    });
+  });
+});
+
+
+// Cập nhật API_CONTEXT để AI hiểu thêm các chỉ số mới
 const API_CONTEXT = `
-Bạn là một trợ lý phân tích dữ liệu bán hàng thông minh. Dữ liệu bán hàng được truy xuất qua API duy nhất:
+Bạn là một trợ lý phân tích dữ liệu bán hàng thông minh. Dữ liệu được truy xuất qua 2 API:
 
-GET /report/orders?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+1. GET /report/orders?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+- overview: Tổng quan đơn hàng và doanh thu
+- dailyRevenue: Doanh thu theo ngày
+- topProducts: Top sản phẩm bán chạy
+- categoryRevenue: Doanh thu theo danh mục
 
-Kết quả API sẽ có các phần:
+2. GET /report/analytics?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+- revenueAnalysis: Phân tích xu hướng doanh thu theo giờ/ngày
+- inventoryAnalysis: Phân tích tồn kho và xu hướng tiêu thụ
+- profitAnalysis: Phân tích lợi nhuận và hiệu quả chiết khấu
+- timeAnalysis: Phân tích thời điểm bán hàng tốt
+- customerAnalysis: Phân tích hành vi khách hàng
 
-1. overview: Tổng quan đơn hàng và doanh thu.
-2. dailyRevenue: Doanh thu theo từng ngày.
-3. topProducts: Top sản phẩm bán chạy nhất (tên, số lượng, doanh thu...).
-4. categoryRevenue: Doanh thu theo từng danh mục sản phẩm.
+Dựa vào câu hỏi, xác định và sử dụng API phù hợp:
 
-Dựa vào câu hỏi người dùng, bạn hãy xác định nên dùng phần nào của API response để trả lời, ví dụ:
-- "Sản phẩm nào bán chạy?" → dùng topProducts
-- "Doanh thu hôm qua?" → dùng dailyRevenue
-- "Danh mục nào bán tốt nhất?" → dùng categoryRevenue
-- "Tổng đơn hàng tuần này?" → dùng overview
+Câu hỏi về doanh thu cơ bản:
+- "Doanh thu hôm nay?" → dùng dailyRevenue
+- "Top 10 sản phẩm" → dùng topProducts
+- "Doanh thu theo danh mục" → dùng categoryRevenue
 
-Khi câu hỏi liên quan đến một khoảng thời gian (ví dụ: "2 tháng qua", "3 tháng gần đây"), hãy tổng hợp dữ liệu trong toàn bộ khoảng thời gian đó, không chỉ lấy dữ liệu của tháng hiện tại.
+Câu hỏi phân tích nâng cao:
+- "Dự báo doanh thu" → dùng revenueAnalysis để phân tích xu hướng
+- "Nên nhập thêm hàng nào?" → dùng inventoryAnalysis xem tỷ lệ tiêu thụ
+- "Thời điểm bán chạy nhất?" → dùng timeAnalysis
+- "Chiết khấu có hiệu quả không?" → dùng profitAnalysis
+- "Khách hàng thân thiết?" → dùng customerAnalysis
 
 Quy tắc hiển thị số tiền:
 1. Sử dụng dấu chấm (.) làm dấu phân cách hàng nghìn
@@ -1088,7 +1259,7 @@ Ví dụ format số tiền:
 - 50000 → 50.000 đồng
 - 1234567 → 1.234.567 đồng
 
-Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu cụ thể nếu có.
+Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu cụ thể và đề xuất hành động nếu có.
 `;
 
 // ====== Hàm trích xuất ngày từ câu hỏi ======
