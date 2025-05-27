@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash, Image as ImageIcon, Search, X } from 'lucide-react
 import { v4 as uuidv4 } from 'uuid';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ChatBot from '../components/ChatBot';
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 const CLOUDINARY_API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
@@ -396,6 +397,7 @@ const InventoryPage = () => {
 
   return (
     <div className="p-6 bg-gray-50/30 min-h-screen">
+      <ChatBot />
       <ToastContainer
         position="top-right"
         autoClose={3000}

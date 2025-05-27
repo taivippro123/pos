@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Package, Clock, XCircle, Users, Wallet, Smartphone } from 'lucide-react';
+import ChatBot from '../components/ChatBot';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -57,6 +58,7 @@ const ReportPage = () => {
 
   return (
     <div className="p-6">
+      <ChatBot />
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Báo cáo doanh thu</h1>
 
       {/* Stats Overview */}

@@ -8,6 +8,7 @@ const moment = require("moment");
 const crypto = require("crypto");
 const WebSocket = require('ws');
 const dotenv = require('dotenv');
+const chrono = require('chrono-node');
 
 // Load environment variables FIRST
 dotenv.config();
@@ -1075,51 +1076,83 @@ Dựa vào câu hỏi người dùng, bạn hãy xác định nên dùng phần 
 - "Danh mục nào bán tốt nhất?" → dùng categoryRevenue
 - "Tổng đơn hàng tuần này?" → dùng overview
 
-Trả lời ngắn gọn, rõ ràng, kèm số liệu nếu có.
+Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu cụ thể nếu có.
 `;
 
 // ====== Hàm trích xuất ngày từ câu hỏi ======
 function extractDateRangeFromQuestion(question) {
-  const results = chrono.parse(question);
+  try {
+    const results = chrono.parse(question, new Date(), { forwardDate: true });
 
-  if (results.length > 0) {
-    const result = results[0];
-    const startDate = result.start?.date();
-    const endDate = result.end?.date() || new Date(); // nếu không có end thì dùng hôm nay
+    if (results.length > 0) {
+      const result = results[0];
+      const startDate = result.start?.date();
+      const endDate = result.end?.date() || new Date();
+
+      return {
+        startDate: startDate.toISOString().split("T")[0],
+        endDate: endDate.toISOString().split("T")[0],
+      };
+    }
+
+    // Nếu không tìm thấy ngày trong câu hỏi, lấy tháng hiện tại
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1); // Ngày đầu tháng
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Ngày cuối tháng
 
     return {
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
+      startDate: start.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0],
+    };
+  } catch (error) {
+    console.error("Error extracting date range:", error);
+    // Fallback: 30 ngày gần nhất
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 30);
+
+    return {
+      startDate: start.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0],
     };
   }
-
-  // Mặc định: 30 ngày gần nhất
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 30);
-
-  return {
-    startDate: start.toISOString().split("T")[0],
-    endDate: end.toISOString().split("T")[0],
-  };
 }
 
 // ========== API /ask-ai ==========
 app.post("/ask-ai", async (req, res) => {
-  const userQuestion = req.body.question;
-  const apiKey = process.env.GEMINI_API_KEY;
-  const API_URL = process.env.API_URL;
-  const { startDate, endDate } = extractDateRangeFromQuestion(userQuestion);
-
   try {
-    // Gọi API báo cáo dữ liệu theo thời gian
-    const reportRes = await axios.get(`${API_URL}/report/orders`, {
-      params: { startDate, endDate },
-    });
+    // Validate request
+    const { question } = req.body;
+    if (!question || typeof question !== 'string') {
+      return res.status(400).json({ 
+        error: "Vui lòng nhập câu hỏi hợp lệ" 
+      });
+    }
 
-    const reportData = reportRes.data;
+    // Validate API key
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("Missing GEMINI_API_KEY");
+      return res.status(500).json({ 
+        error: "Chưa cấu hình API key cho AI" 
+      });
+    }
 
-    const prompt = `
+    // Extract date range
+    const { startDate, endDate } = extractDateRangeFromQuestion(question);
+    console.log(`Date range: ${startDate} to ${endDate}`);
+
+    // Get report data
+    try {
+      const reportRes = await axios.get(`${process.env.API_URL}/report/orders`, {
+        params: { startDate, endDate },
+        timeout: 10000 // 10 second timeout
+      });
+
+      const reportData = reportRes.data;
+
+      // Prepare prompt
+      const prompt = `
 ${API_CONTEXT}
 
 Khoảng thời gian: từ ${startDate} đến ${endDate}
@@ -1127,26 +1160,48 @@ Khoảng thời gian: từ ${startDate} đến ${endDate}
 Dữ liệu:
 ${JSON.stringify(reportData, null, 2)}
 
-Câu hỏi: ${userQuestion}
-    `.trim();
+Câu hỏi: ${question}
+      `.trim();
 
-    const payload = {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    };
+      // Call Gemini API
+      const payload = {
+        contents: [{ 
+          role: "user", 
+          parts: [{ text: prompt }] 
+        }]
+      };
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      payload
-    );
+      const geminiRes = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        payload,
+        { timeout: 15000 } // 15 second timeout
+      );
 
-    const aiReply =
-      response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Không có phản hồi từ AI.";
+      // Extract and validate AI response
+      const aiReply = geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!aiReply) {
+        throw new Error("Không nhận được phản hồi hợp lệ từ AI");
+      }
 
-    res.json({ reply: aiReply });
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ error: "Gemini API thất bại hoặc lỗi lấy dữ liệu báo cáo." });
+      return res.json({ reply: aiReply });
+
+    } catch (error) {
+      console.error("Error fetching report data:", error);
+      if (error.response?.status === 404) {
+        return res.status(404).json({ 
+          error: "Không tìm thấy dữ liệu báo cáo cho khoảng thời gian này" 
+        });
+      }
+      throw error; // Let the outer catch handle other errors
+    }
+
+  } catch (error) {
+    console.error("Error in /ask-ai:", error);
+    const errorMessage = error.response?.data?.error || 
+                        error.message || 
+                        "Lỗi xử lý yêu cầu. Vui lòng thử lại sau.";
+    
+    return res.status(500).json({ error: errorMessage });
   }
 });
 

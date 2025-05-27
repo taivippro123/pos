@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Key, Users, Pencil, Trash, X, Search } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ChatBot from '../components/ChatBot';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -297,6 +298,7 @@ const SettingsPage = () => {
 
   return (
     <div className="p-6 bg-gray-50/30 min-h-screen">
+      <ChatBot />
       <ToastContainer
         position="top-right"
         autoClose={3000}

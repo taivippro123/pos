@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Search, X } from 'lucide-react';
+import ChatBot from '../components/ChatBot';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -138,6 +139,7 @@ const OrdersPage = () => {
 
   return (
     <div className="p-6 bg-gray-50/30 min-h-screen">
+      <ChatBot />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Đơn hàng</h1>
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">

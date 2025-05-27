@@ -10,7 +10,7 @@ import CustomerPage from './pages/CustomerPage';
 import ReportPage from './pages/ReportPage';
 import SettingsPage from './pages/SettingsPage';
 import PaymentSuccessTTS from './components/PaymentSuccessTTS'; // hoặc đúng path của bạn
-
+import ChatBot from './components/ChatBot';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
