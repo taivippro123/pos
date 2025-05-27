@@ -1057,6 +1057,101 @@ app.post("/zalopay/callback", async (req, res) => {
 });
 
 
+const API_CONTEXT = `
+Bạn là một trợ lý phân tích dữ liệu bán hàng thông minh. Dữ liệu bán hàng được truy xuất qua API duy nhất:
+
+GET /report/orders?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Kết quả API sẽ có các phần:
+
+1. overview: Tổng quan đơn hàng và doanh thu.
+2. dailyRevenue: Doanh thu theo từng ngày.
+3. topProducts: Top sản phẩm bán chạy nhất (tên, số lượng, doanh thu...).
+4. categoryRevenue: Doanh thu theo từng danh mục sản phẩm.
+
+Dựa vào câu hỏi người dùng, bạn hãy xác định nên dùng phần nào của API response để trả lời, ví dụ:
+- "Sản phẩm nào bán chạy?" → dùng topProducts
+- "Doanh thu hôm qua?" → dùng dailyRevenue
+- "Danh mục nào bán tốt nhất?" → dùng categoryRevenue
+- "Tổng đơn hàng tuần này?" → dùng overview
+
+Trả lời ngắn gọn, rõ ràng, kèm số liệu nếu có.
+`;
+
+// ====== Hàm trích xuất ngày từ câu hỏi ======
+function extractDateRangeFromQuestion(question) {
+  const results = chrono.parse(question);
+
+  if (results.length > 0) {
+    const result = results[0];
+    const startDate = result.start?.date();
+    const endDate = result.end?.date() || new Date(); // nếu không có end thì dùng hôm nay
+
+    return {
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+    };
+  }
+
+  // Mặc định: 30 ngày gần nhất
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 30);
+
+  return {
+    startDate: start.toISOString().split("T")[0],
+    endDate: end.toISOString().split("T")[0],
+  };
+}
+
+// ========== API /ask-ai ==========
+app.post("/ask-ai", async (req, res) => {
+  const userQuestion = req.body.question;
+  const apiKey = process.env.GEMINI_API_KEY;
+  const API_URL = process.env.API_URL;
+  const { startDate, endDate } = extractDateRangeFromQuestion(userQuestion);
+
+  try {
+    // Gọi API báo cáo dữ liệu theo thời gian
+    const reportRes = await axios.get(`${API_URL}/report/orders`, {
+      params: { startDate, endDate },
+    });
+
+    const reportData = reportRes.data;
+
+    const prompt = `
+${API_CONTEXT}
+
+Khoảng thời gian: từ ${startDate} đến ${endDate}
+
+Dữ liệu:
+${JSON.stringify(reportData, null, 2)}
+
+Câu hỏi: ${userQuestion}
+    `.trim();
+
+    const payload = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    };
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      payload
+    );
+
+    const aiReply =
+      response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Không có phản hồi từ AI.";
+
+    res.json({ reply: aiReply });
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Gemini API thất bại hoặc lỗi lấy dữ liệu báo cáo." });
+  }
+});
+
+
+
 
 // ✅ API kiểm tra kết nối DB
 app.get("/ping", (req, res) => {

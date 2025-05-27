@@ -71,6 +71,7 @@ const App = () => {
         </div>
         <PaymentSuccessTTS />
       </div>
+      <ChatBot />
     </Router>
   );
 };
