@@ -85,6 +85,13 @@ const MenuPage = () => {
       product.name.toLowerCase().includes(searchQuery) ||
       (product.description && product.description.toLowerCase().includes(searchQuery));
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+    // Sắp xếp theo giảm giá trước (từ cao đến thấp)
+    if (a.discount_percent !== b.discount_percent) {
+      return (b.discount_percent || 0) - (a.discount_percent || 0);
+    }
+    // Nếu giảm giá bằng nhau, sắp xếp theo số lượng đã bán
+    return (b.total_sold || 0) - (a.total_sold || 0);
   });
 
   if (loading) {

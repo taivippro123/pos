@@ -21,6 +21,8 @@ const InventoryPage = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [newProduct, setNewProduct] = useState({
     category_id: '',
     name: '',
@@ -377,6 +379,100 @@ const InventoryPage = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Tính toán số trang và các sản phẩm hiển thị
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Xử lý chuyển trang
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  // Component điều hướng trang
+  const Pagination = () => {
+    return (
+      <div className="flex justify-center items-center gap-2 mt-4 mb-6">
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === 1
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          Đầu
+        </button>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === 1
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          Trước
+        </button>
+        
+        {[...Array(totalPages)].map((_, index) => {
+          const pageNumber = index + 1;
+          // Hiển thị 3 trang trước và sau trang hiện tại
+          if (
+            pageNumber === 1 ||
+            pageNumber === totalPages ||
+            (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+          ) {
+            return (
+              <button
+                key={pageNumber}
+                onClick={() => handlePageChange(pageNumber)}
+                className={`px-3 py-1 rounded-lg ${
+                  currentPage === pageNumber
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                {pageNumber}
+              </button>
+            );
+          } else if (
+            pageNumber === currentPage - 3 ||
+            pageNumber === currentPage + 3
+          ) {
+            return <span key={pageNumber}>...</span>;
+          }
+          return null;
+        })}
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === totalPages
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          Sau
+        </button>
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === totalPages
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          Cuối
+        </button>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50/30">
@@ -470,7 +566,7 @@ const InventoryPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
-              {filteredProducts.map((product) => (
+              {currentItems.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <img
@@ -525,6 +621,9 @@ const InventoryPage = () => {
           </table>
         </div>
       </div>
+
+      {/* Thêm phân trang */}
+      {filteredProducts.length > 0 && <Pagination />}
 
       {/* Add/Edit Product Modal */}
       {isAddModalOpen && (
