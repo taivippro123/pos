@@ -1537,8 +1537,101 @@ Câu hỏi: ${question}
   }
 });
 
+// Text to Speech Helper Functions
+const numberToVietnameseWords = (num) => {
+  const ones = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+  const tens = ["", "mười", "hai mươi", "ba mươi", "bốn mươi", "năm mươi", "sáu mươi", "bảy mươi", "tám mươi", "chín mươi"];
 
+  if (num === 0) return "không";
 
+  const toWordsBelowThousand = (n) => {
+    let result = "";
+
+    const hundred = Math.floor(n / 100);
+    const remainder = n % 100;
+    const ten = Math.floor(remainder / 10);
+    const unit = remainder % 10;
+
+    if (hundred > 0) {
+      result += ones[hundred] + " trăm ";
+      if (remainder > 0 && ten === 0) result += "lẻ ";
+    }
+
+    if (ten > 1) {
+      result += tens[ten] + (unit ? " " + ones[unit] : "");
+    } else if (ten === 1) {
+      result += "mười" + (unit ? " " + ones[unit] : "");
+    } else if (ten === 0 && unit > 0) {
+      result += ones[unit];
+    }
+
+    return result.trim();
+  };
+
+  let result = "";
+  const million = Math.floor(num / 1_000_000);
+  const thousand = Math.floor((num % 1_000_000) / 1_000);
+  const belowThousand = num % 1_000;
+
+  if (million > 0) {
+    result += toWordsBelowThousand(million) + " triệu ";
+  }
+
+  if (thousand > 0) {
+    result += toWordsBelowThousand(thousand) + " nghìn ";
+  } else if (million > 0 && (belowThousand > 0 || thousand === 0)) {
+    result += "không nghìn ";
+  }
+
+  if (belowThousand > 0) {
+    result += toWordsBelowThousand(belowThousand);
+  }
+
+  return result.trim();
+};
+
+// Text to Speech API Endpoint
+app.post("/api/tts/payment-success", async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: "Thiếu số tiền" });
+    }
+
+    // 1. Làm sạch số tiền
+    const cleanAmount = parseInt(Number(amount));
+    
+    // 2. Chuyển số thành chữ
+    const amountInWords = numberToVietnameseWords(cleanAmount);
+    
+    // 3. Tạo câu hoàn chỉnh
+    const message = `Thanh toán thành công ${amountInWords} đồng`;
+
+    // 4. Gọi Google TTS API
+    const response = await axios.post(
+      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`,
+      {
+        input: { text: message },
+        voice: { languageCode: "vi-VN", ssmlGender: "FEMALE" },
+        audioConfig: { audioEncoding: "MP3" },
+      }
+    );
+
+    // 5. Trả về audio content
+    res.json({ 
+      audioContent: response.data.audioContent,
+      message: message 
+    });
+
+  } catch (error) {
+    console.error("TTS Error:", error);
+    res.status(500).json({ 
+      error: "Lỗi khi xử lý text-to-speech",
+      details: error.message 
+    });
+  }
+});
 
 // ✅ API kiểm tra kết nối DB
 app.get("/ping", (req, res) => {

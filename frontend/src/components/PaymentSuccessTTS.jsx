@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import axios from "axios";
 
-const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+const API_URL = import.meta.env.VITE_API_URL;
 
 const numberToVietnameseWords = (num) => {
     const ones = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
@@ -57,40 +57,24 @@ const numberToVietnameseWords = (num) => {
   };
   
 
-const speak = async (text) => {
-  try {
-    const response = await axios.post(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${API_KEY}`,
-      {
-        input: { text },
-        voice: { languageCode: "vi-VN", ssmlGender: "FEMALE" },
-        audioConfig: { audioEncoding: "MP3" },
-      }
-    );
-
-    const audio = new Audio("data:audio/mp3;base64," + response.data.audioContent);
-    audio.play();
-  } catch (error) {
-    console.error("Google TTS Error:", error);
-  }
-};
-
 const PaymentSuccessTTS = () => {
   useEffect(() => {
-    const handlePaymentSuccess = (e) => {
-      let rawAmount = e.detail?.amount;
+    const handlePaymentSuccess = async (e) => {
+      try {
+        const rawAmount = e.detail?.amount;
+        
+        // Gọi API backend để xử lý TTS
+        const response = await axios.post(`${API_URL}/api/tts/payment-success`, {
+          amount: rawAmount
+        });
 
-      // 1. Làm sạch: ép kiểu int, bỏ phần thập phân nếu có
-      let amount = parseInt(Number(rawAmount));
-
-      // 2. Convert sang chữ
-      const amountInWords = numberToVietnameseWords(amount);
-
-      // 3. Ghép câu hoàn chỉnh
-      const message = `Thanh toán thành công ${amountInWords} đồng`;
-
-      // 4. Đọc
-      speak(message);
+        // Phát audio từ base64 string
+        const audio = new Audio("data:audio/mp3;base64," + response.data.audioContent);
+        audio.play();
+        
+      } catch (error) {
+        console.error("Payment Success TTS Error:", error);
+      }
     };
 
     window.addEventListener("payment_success", handlePaymentSuccess);
