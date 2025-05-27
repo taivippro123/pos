@@ -634,12 +634,17 @@ app.get("/transactions", (req, res) => {
 
 // DOANH THU REPORT (theo ngày)
 app.get("/report/revenue", (req, res) => {
+  const { startDate, endDate } = req.query;
+  
   db.query(
-    `SELECT DATE(payment_time) as date, SUM(amount) as total_revenue
-     FROM transactions
-     WHERE status = 'success'
-     GROUP BY DATE(payment_time)
+    `SELECT DATE(created_at) as date, SUM(total_amount) as total_revenue
+     FROM orders
+     WHERE payment_status = 'paid'
+     AND DATE(created_at) BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
+     AND IFNULL(?, NOW())
+     GROUP BY DATE(created_at)
      ORDER BY date DESC`,
+    [startDate, endDate],
     (err, result) => {
       if (err)
         return res
@@ -655,7 +660,7 @@ app.get("/report/revenue", (req, res) => {
 app.get("/report/orders", (req, res) => {
   const { startDate, endDate } = req.query;
 
-  // Query tổng quan đơn hàng và doanh thu
+  // Query tổng quan đơn hàng và doanh thu - chỉ tính đơn paid
   const overviewQuery = `
     SELECT 
       COUNT(*) AS total_orders,
@@ -664,17 +669,17 @@ app.get("/report/orders", (req, res) => {
       COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) AS pending_orders,
       COUNT(CASE WHEN payment_status = 'cancelled' THEN 1 END) AS cancelled_orders,
       SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS paid_revenue,
-      SUM(CASE WHEN payment_status = 'pending' THEN total_amount ELSE 0 END) AS pending_revenue,
+      0 AS pending_revenue,
       COUNT(DISTINCT user_id) AS unique_customers,
       COUNT(CASE WHEN payment_method = 'cash' AND payment_status = 'paid' THEN 1 END) AS cash_orders,
       COUNT(CASE WHEN payment_method = 'zalopay' AND payment_status = 'paid' THEN 1 END) AS zalopay_orders,
       COUNT(CASE WHEN payment_method = 'banking' AND payment_status = 'paid' THEN 1 END) AS banking_orders
     FROM orders
-    WHERE created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
+    WHERE DATE(created_at) BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
   `;
 
-  // Query doanh thu theo ngày
+  // Query doanh thu theo ngày - chỉ tính đơn paid
   const dailyRevenueQuery = `
     SELECT 
       DATE(created_at) AS date,
@@ -689,13 +694,13 @@ app.get("/report/orders", (req, res) => {
       COUNT(CASE WHEN payment_method = 'zalopay' AND payment_status = 'paid' THEN 1 END) AS zalopay_orders,
       COUNT(CASE WHEN payment_method = 'banking' AND payment_status = 'paid' THEN 1 END) AS banking_orders
     FROM orders
-    WHERE created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
+    WHERE DATE(created_at) BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
     GROUP BY DATE(created_at)
     ORDER BY date DESC
   `;
 
-  // Query top sản phẩm bán chạy - Sửa lại cách tính doanh thu
+  // Query top sản phẩm bán chạy - chỉ tính đơn paid
   const topProductsQuery = `
     SELECT 
       od.product_id,
@@ -710,18 +715,17 @@ app.get("/report/orders", (req, res) => {
       AVG(od.discount_percent_at_order) AS avg_discount,
       COUNT(DISTINCT od.order_id) AS order_count
     FROM order_details od
-    JOIN orders o ON od.order_id = o.id
+    JOIN orders o ON od.order_id = o.id AND o.payment_status = 'paid'
     LEFT JOIN products p ON od.product_id = p.id
     LEFT JOIN categories c ON p.category_id = c.id
-    WHERE o.created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
+    WHERE DATE(o.created_at) BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
-    AND o.payment_status = 'paid'
     GROUP BY od.product_id, od.product_name, p.category_id, c.name
     ORDER BY total_revenue DESC
     LIMIT 10
   `;
 
-  // Query doanh thu theo danh mục - Sửa lại cách tính doanh thu
+  // Query doanh thu theo danh mục - chỉ tính đơn paid
   const categoryRevenueQuery = `
     SELECT 
       c.id AS category_id,
@@ -734,12 +738,11 @@ app.get("/report/orders", (req, res) => {
       COUNT(DISTINCT o.id) AS order_count,
       COUNT(DISTINCT o.user_id) AS customer_count
     FROM order_details od
-    JOIN orders o ON od.order_id = o.id
+    JOIN orders o ON od.order_id = o.id AND o.payment_status = 'paid'
     JOIN products p ON od.product_id = p.id
     JOIN categories c ON p.category_id = c.id
-    WHERE o.created_at BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
+    WHERE DATE(o.created_at) BETWEEN IFNULL(?, DATE_SUB(NOW(), INTERVAL 30 DAY)) 
     AND IFNULL(?, NOW())
-    AND o.payment_status = 'paid'
     GROUP BY c.id, c.name
     ORDER BY total_revenue DESC
   `;
@@ -1342,6 +1345,33 @@ Trả lời bằng tiếng Việt, thân thiện, dễ hiểu, tập trung vào 
 function extractDateRangeFromQuestion(question) {
   try {
     const lowerQuestion = question.toLowerCase();
+    const currentYear = new Date().getFullYear();
+
+    // Xử lý ngày cụ thể (VD: ngày 30/4)
+    const specificDateMatch = lowerQuestion.match(/ngày\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
+    if (specificDateMatch) {
+      const day = parseInt(specificDateMatch[1]);
+      const month = parseInt(specificDateMatch[2]);
+      const year = specificDateMatch[3] ? parseInt(specificDateMatch[3]) : currentYear;
+      const date = new Date(year, month - 1, day);
+      return {
+        startDate: date.toISOString().split("T")[0],
+        endDate: date.toISOString().split("T")[0]
+      };
+    }
+
+    // Xử lý tháng cụ thể (VD: tháng 4)
+    const monthMatch = lowerQuestion.match(/tháng\s*(\d{1,2})(?:\/(\d{4}))?/);
+    if (monthMatch) {
+      const month = parseInt(monthMatch[1]);
+      const year = monthMatch[2] ? parseInt(monthMatch[2]) : currentYear;
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0); // Ngày cuối của tháng
+      return {
+        startDate: start.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0]
+      };
+    }
 
     // Xử lý "tất cả" hoặc "all time"
     if (lowerQuestion.includes('tất cả')
@@ -1349,12 +1379,11 @@ function extractDateRangeFromQuestion(question) {
       || lowerQuestion.includes('all time')
       || lowerQuestion.includes('tất cả thời gian')
       || lowerQuestion.includes('năm qua')) {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), 0, 1); // Ngày đầu năm hiện tại
-      const end = new Date();
+      const start = new Date(currentYear, 0, 1); // Ngày đầu năm hiện tại
+      const end = new Date(currentYear, 11, 31); // Ngày cuối năm hiện tại
       return {
         startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0]
       };
     }
 
@@ -1362,37 +1391,12 @@ function extractDateRangeFromQuestion(question) {
     const monthsAgoMatch = lowerQuestion.match(/(\d+)\s*tháng\s*(qua|gần đây|trước|vừa qua)/);
     if (monthsAgoMatch) {
       const monthsAgo = parseInt(monthsAgoMatch[1]);
-      const now = new Date();
+      const now = new Date(); // Sử dụng thời gian hiện tại
       const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       return {
         startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0],
-      };
-    }
-
-    // Xử lý tháng cụ thể
-    const monthMatch = lowerQuestion.match(/tháng\s*(\d{1,2})/);
-    if (monthMatch) {
-      const monthNum = parseInt(monthMatch[1]) - 1; // Convert to 0-based month
-      const year = new Date().getFullYear();
-      const start = new Date(year, monthNum, 1);
-      const end = new Date(year, monthNum + 1, 0);
-      return {
-        startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0],
-      };
-    }
-
-    // Sử dụng chrono để parse các mốc thời gian khác
-    const results = chrono.parse(question, new Date(), { forwardDate: true });
-    if (results.length > 0) {
-      const result = results[0];
-      const startDate = result.start?.date();
-      const endDate = result.end?.date() || new Date();
-      return {
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0]
       };
     }
 
@@ -1403,7 +1407,7 @@ function extractDateRangeFromQuestion(question) {
 
     return {
       startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0]
     };
   } catch (error) {
     console.error("Error extracting date range:", error);
@@ -1414,7 +1418,7 @@ function extractDateRangeFromQuestion(question) {
 
     return {
       startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0]
     };
   }
 }
