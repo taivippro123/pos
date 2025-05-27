@@ -1143,18 +1143,44 @@ app.get("/report/analytics", (req, res) => {
     SELECT 
       u.id,
       u.name,
-      COUNT(o.id) as total_orders,
+      u.phone,
+      COUNT(DISTINCT o.id) as total_orders,
       SUM(o.total_amount) as total_spent,
       AVG(o.total_amount) as avg_order_value,
       MAX(o.created_at) as last_order_date,
+      MIN(o.created_at) as first_order_date,
+      DATEDIFF(MAX(o.created_at), MIN(o.created_at)) as days_between_first_last_order,
+      COUNT(DISTINCT p.category_id) as unique_categories_bought,
       GROUP_CONCAT(DISTINCT p.category_id) as preferred_categories,
-      COUNT(DISTINCT p.category_id) as category_count
+      GROUP_CONCAT(DISTINCT 
+        CONCAT(
+          od.product_name, 
+          ' (', od.quantity, ' lần',
+          ', giá: ', od.price_at_order,
+          IF(od.discount_percent_at_order > 0, 
+             CONCAT(', giảm: ', od.discount_percent_at_order, '%'),
+             ''),
+          ')'
+        )
+        ORDER BY od.product_name
+        SEPARATOR '; '
+      ) as purchased_products,
+      GROUP_CONCAT(DISTINCT 
+        CONCAT(
+          DATE_FORMAT(o.created_at, '%d/%m/%Y'),
+          ' - ',
+          FORMAT(o.total_amount, 0),
+          'đ'
+        )
+        ORDER BY o.created_at DESC
+        SEPARATOR '; '
+      ) as order_history
     FROM users u
     LEFT JOIN orders o ON u.id = o.user_id AND o.payment_status = 'paid'
     LEFT JOIN order_details od ON o.id = od.order_id
     LEFT JOIN products p ON od.product_id = p.id
     WHERE o.created_at BETWEEN ? AND ?
-    GROUP BY u.id, u.name
+    GROUP BY u.id, u.name, u.phone
     HAVING total_orders > 0
     ORDER BY total_spent DESC
   `;

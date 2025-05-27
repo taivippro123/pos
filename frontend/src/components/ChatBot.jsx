@@ -3,6 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL;
 
+const formatBoldText = (text) => {
+  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+};
+
 const ChatBot = () => {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -155,7 +159,10 @@ const ChatBot = () => {
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                  <div 
+                    className="text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: formatBoldText(msg.content) }}
+                  />
                   <div className={`text-xs mt-1 ${
                     msg.type === 'user' ? 'text-blue-100' : 'text-gray-500'
                   }`}>
