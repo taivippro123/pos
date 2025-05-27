@@ -63,17 +63,40 @@ const PaymentSuccessTTS = () => {
       try {
         const rawAmount = e.detail?.amount;
         
+        if (!rawAmount) {
+          console.error("Missing amount in payment success event");
+          return;
+        }
+
         // Gọi API backend để xử lý TTS
         const response = await axios.post(`${API_URL}/api/tts/payment-success`, {
           amount: rawAmount
         });
 
+        if (!response.data?.audioContent) {
+          console.error("Missing audio content in response");
+          return;
+        }
+
         // Phát audio từ base64 string
         const audio = new Audio("data:audio/mp3;base64," + response.data.audioContent);
-        audio.play();
+        
+        // Xử lý lỗi phát audio
+        audio.onerror = (error) => {
+          console.error("Audio playback error:", error);
+        };
+
+        await audio.play().catch(error => {
+          console.error("Failed to play audio:", error);
+        });
         
       } catch (error) {
-        console.error("Payment Success TTS Error:", error);
+        // Log chi tiết lỗi
+        console.error("Payment Success TTS Error:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
       }
     };
 

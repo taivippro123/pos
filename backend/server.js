@@ -1599,6 +1599,14 @@ app.post("/api/tts/payment-success", async (req, res) => {
       return res.status(400).json({ error: "Thiếu số tiền" });
     }
 
+    // Kiểm tra API key
+    if (!process.env.GOOGLE_API_KEY) {
+      console.error("Missing GOOGLE_API_KEY in environment variables");
+      return res.status(500).json({ 
+        error: "Chưa cấu hình Google API key" 
+      });
+    }
+
     // 1. Làm sạch số tiền
     const cleanAmount = parseInt(Number(amount));
     
@@ -1608,24 +1616,50 @@ app.post("/api/tts/payment-success", async (req, res) => {
     // 3. Tạo câu hoàn chỉnh
     const message = `Thanh toán thành công ${amountInWords} đồng`;
 
-    // 4. Gọi Google TTS API
-    const response = await axios.post(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`,
-      {
-        input: { text: message },
-        voice: { languageCode: "vi-VN", ssmlGender: "FEMALE" },
-        audioConfig: { audioEncoding: "MP3" },
-      }
-    );
+    try {
+      // 4. Gọi Google TTS API với timeout
+      const response = await axios.post(
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`,
+        {
+          input: { text: message },
+          voice: { languageCode: "vi-VN", ssmlGender: "FEMALE" },
+          audioConfig: { audioEncoding: "MP3" },
+        },
+        {
+          timeout: 10000, // 10 second timeout
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': process.env.GOOGLE_API_KEY
+          }
+        }
+      );
 
-    // 5. Trả về audio content
-    res.json({ 
-      audioContent: response.data.audioContent,
-      message: message 
-    });
+      // 5. Trả về audio content
+      return res.json({ 
+        audioContent: response.data.audioContent,
+        message: message 
+      });
+
+    } catch (apiError) {
+      console.error("Google TTS API Error:", {
+        status: apiError.response?.status,
+        data: apiError.response?.data,
+        message: apiError.message
+      });
+
+      // Trả về lỗi cụ thể cho client
+      if (apiError.response?.status === 403) {
+        return res.status(500).json({
+          error: "Lỗi xác thực với Google TTS API. Vui lòng kiểm tra cấu hình API key.",
+          details: apiError.response.data
+        });
+      }
+
+      throw apiError; // Ném lỗi để catch block bên ngoài xử lý
+    }
 
   } catch (error) {
-    console.error("TTS Error:", error);
+    console.error("TTS Processing Error:", error);
     res.status(500).json({ 
       error: "Lỗi khi xử lý text-to-speech",
       details: error.message 
