@@ -1078,6 +1078,16 @@ Dựa vào câu hỏi người dùng, bạn hãy xác định nên dùng phần 
 
 Khi câu hỏi liên quan đến một khoảng thời gian (ví dụ: "2 tháng qua", "3 tháng gần đây"), hãy tổng hợp dữ liệu trong toàn bộ khoảng thời gian đó, không chỉ lấy dữ liệu của tháng hiện tại.
 
+Quy tắc hiển thị số tiền:
+1. Sử dụng dấu chấm (.) làm dấu phân cách hàng nghìn
+2. KHÔNG sử dụng số thập phân cho VNĐ
+3. Luôn kết thúc bằng đơn vị "đồng" hoặc "VNĐ"
+
+Ví dụ format số tiền:
+- 1000000 → 1.000.000 đồng
+- 50000 → 50.000 đồng
+- 1234567 → 1.234.567 đồng
+
 Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, kèm số liệu cụ thể nếu có.
 `;
 
