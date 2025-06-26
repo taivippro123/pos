@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MenuPage from './pages/MenuPage';
 import InventoryPage from './pages/InventoryPage';
@@ -11,6 +11,12 @@ import ReportPage from './pages/ReportPage';
 import SettingsPage from './pages/SettingsPage';
 import PaymentSuccessTTS from './components/PaymentSuccessTTS'; // hoặc đúng path của bạn
 import ChatBot from './components/ChatBot';
+
+// Kiểm tra xem đang chạy trong môi trường Electron hay không
+const isElectron = window && window.process && window.process.type;
+
+// Chọn Router phù hợp dựa vào môi trường
+const Router = isElectron ? HashRouter : BrowserRouter;
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -75,6 +81,5 @@ const App = () => {
     </Router>
   );
 };
-
 
 export default App;
