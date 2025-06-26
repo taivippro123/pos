@@ -11,6 +11,7 @@ import ReportPage from './pages/ReportPage';
 import SettingsPage from './pages/SettingsPage';
 import PaymentSuccessTTS from './components/PaymentSuccessTTS'; // hoặc đúng path của bạn
 import ChatBot from './components/ChatBot';
+import CustomerDisplayPage from './pages/CustomerDisplayPage';
 
 // Kiểm tra xem đang chạy trong môi trường Electron hay không
 const isElectron = window && window.process && window.process.type;
@@ -58,26 +59,32 @@ const App = () => {
 
   return (
     <Router>
-      <div className="flex h-screen bg-gray-100">
-        {isAuthenticated && <Sidebar onLogout={handleLogout} />}
-        <div className="flex-1 overflow-auto">
-          <Routes>
-            <Route path="/login" element={
-              isAuthenticated ? <Navigate to="/" /> : <LoginPage onLogin={handleLogin} />
-            } />
-            {routes.map((route) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={<ProtectedRoute>{route.element}</ProtectedRoute>}
-              />
-            ))}
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
+      <Routes>
+        <Route path="/customer-display" element={<CustomerDisplayPage />} />
+      </Routes>
+      {/* Các route khác giữ nguyên layout cũ */}
+      {window.location.pathname !== '/customer-display' && (
+        <div className="flex h-screen bg-gray-100">
+          {isAuthenticated && <Sidebar onLogout={handleLogout} />}
+          <div className="flex-1 overflow-auto">
+            <Routes>
+              <Route path="/login" element={
+                isAuthenticated ? <Navigate to="/" /> : <LoginPage onLogin={handleLogin} />
+              } />
+              {routes.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={<ProtectedRoute>{route.element}</ProtectedRoute>}
+                />
+              ))}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </div>
+          <PaymentSuccessTTS />
         </div>
-        <PaymentSuccessTTS />
-      </div>
-      <ChatBot />
+      )}
+      {window.location.pathname !== '/customer-display' && <ChatBot />}
     </Router>
   );
 };

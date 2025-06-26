@@ -351,6 +351,27 @@ const OrderSummary = () => {
     }
   };
 
+  // Broadcast order state to customer display
+  useEffect(() => {
+    const orderState = {
+      orderItems,
+      paymentMethod,
+      customerName,
+      customerPhone,
+      note,
+      zalopayQR,
+      currentOrderId,
+      total: calculateSubtotal(),
+    };
+    if ('BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('order-sync');
+      channel.postMessage(orderState);
+      channel.close();
+    } else {
+      localStorage.setItem('customerDisplayOrder', JSON.stringify(orderState));
+    }
+  }, [orderItems, paymentMethod, customerName, customerPhone, note, zalopayQR, currentOrderId]);
+
   return (
     <div className="w-[350px] border-l border-gray-200 bg-white p-6 flex flex-col h-full">
       <ToastContainer
@@ -365,6 +386,21 @@ const OrderSummary = () => {
         pauseOnHover
         theme="light"
       />
+      <button
+        onClick={() => {
+          // Detect Electron
+          const isElectron = window && window.process && window.process.type;
+          if (isElectron && window.electronAPI && window.electronAPI.openCustomerDisplay) {
+            window.electronAPI.openCustomerDisplay();
+          } else {
+            // For web, open a new tab with the customer display route
+            window.open('/customer-display', '_blank');
+          }
+        }}
+        className="mb-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold transition-colors"
+      >
+        Mở màn hình khách hàng
+      </button>
       <div className="mb-6">
         <div className="space-y-2 mb-4">
           <div className="relative">
