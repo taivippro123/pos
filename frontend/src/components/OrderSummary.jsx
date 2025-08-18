@@ -23,6 +23,7 @@ const OrderSummary = () => {
   const [currentAppTransId, setCurrentAppTransId] = useState(null);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
 
   useEffect(() => {
     const handleAddToOrder = (event) => {
@@ -84,7 +85,15 @@ const OrderSummary = () => {
         setSuccessMessage(`Đã nhận ${formattedAmount}`);
         setShowSuccess(true);
         
-        // Tự động ẩn thông báo sau 5 giây
+        // Đánh dấu thanh toán đã hoàn thành để dừng polling
+        setPaymentCompleted(true);
+        
+        // Reset state ngay lập tức để dừng polling
+        setCurrentOrderId(null);
+        setZalopayQR(null);
+        setCurrentAppTransId(null);
+        
+        // Tự động ẩn thông báo sau 5 giây và reset form hoàn toàn
         setTimeout(() => {
           setShowSuccess(false);
           // Reset form sau khi thanh toán thành công
@@ -93,8 +102,8 @@ const OrderSummary = () => {
           setCustomerPhone("");
           setNote("");
           setIsNewCustomer(false);
-          setZalopayQR(null);
-          setCurrentOrderId(null);
+          setPaymentMethod('cash'); // Reset về cash
+          setPaymentCompleted(false); // Reset trạng thái thanh toán
         }, 5000);
         
         return true; // Thanh toán thành công
@@ -111,12 +120,22 @@ const OrderSummary = () => {
     let checkCount = 0;
     const maxChecks = 30; // Giới hạn kiểm tra tối đa 30 lần (1 phút với interval 2s)
     
-    if (currentOrderId && paymentMethod === "zalopay") {
+    if (currentOrderId && paymentMethod === "zalopay" && !paymentCompleted) {
+      console.log(`🔄 Bắt đầu kiểm tra thanh toán cho đơn hàng ${currentOrderId}`);
+      
       // Kiểm tra ngay lập tức
       checkPaymentStatus(currentOrderId);
       
       // Sau đó kiểm tra mỗi 2 giây với logic thông minh
       interval = setInterval(async () => {
+        // Kiểm tra lại trạng thái paymentCompleted trước khi thực hiện check
+        if (paymentCompleted) {
+          clearInterval(interval);
+          interval = null;
+          console.log(`✅ Dừng kiểm tra vì thanh toán đã hoàn thành`);
+          return;
+        }
+        
         checkCount++;
         const isPaid = await checkPaymentStatus(currentOrderId);
         
@@ -136,9 +155,10 @@ const OrderSummary = () => {
     return () => {
       if (interval) {
         clearInterval(interval);
+        console.log(`🛑 Cleanup interval cho đơn hàng ${currentOrderId}`);
       }
     };
-  }, [currentOrderId, paymentMethod]);
+  }, [currentOrderId, paymentMethod, paymentCompleted]);
 
   const handlePhoneChange = async (phone) => {
     setCustomerPhone(phone);
@@ -241,6 +261,8 @@ const OrderSummary = () => {
     setPaymentMethod('cash');
     setIsLoadingQR(false);
     setIsCancelling(false);
+    setPaymentCompleted(false);
+    setShowSuccess(false);
   };
 
   const handlePlaceOrder = async () => {
@@ -255,6 +277,7 @@ const OrderSummary = () => {
     }
 
     setIsLoadingQR(true);
+    setPaymentCompleted(false); // Reset trạng thái thanh toán khi tạo đơn mới
     try {
       const token = localStorage.getItem("token");
 
