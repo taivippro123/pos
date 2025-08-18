@@ -1039,22 +1039,33 @@ app.post("/zalopay/callback", async (req, res) => {
 
     const { app_trans_id, zp_trans_id, server_time, amount } = callbackData;
 
-    // ✅ Cập nhật bảng transactions
-    await db.execute(
+    // ✅ Cập nhật bảng transactions ngay lập tức
+    const updateResult = await db.execute(
       `UPDATE transactions 
        SET status = ?, zp_transaction_id = ?, payment_time = ? 
        WHERE app_trans_id = ?`,
       ["success", zp_trans_id, new Date(server_time), app_trans_id]
     );
 
-    // ✅ Đồng bộ bảng orders theo transaction
-    await db.execute(
+    console.log(`✅ Updated ${updateResult[0].affectedRows} transaction record(s)`);
+
+    // ✅ Đồng bộ bảng orders theo transaction ngay lập tức
+    const orderUpdateResult = await db.execute(
       `UPDATE orders o
        JOIN transactions t ON o.id = t.order_id
        SET o.payment_status = 'paid'
        WHERE t.app_trans_id = ? AND t.status = 'success'`,
       [app_trans_id]
     );
+
+    console.log(`✅ Updated ${orderUpdateResult[0].affectedRows} order record(s) to 'paid' status`);
+
+    // ✅ Ghi log để debug
+    if (orderUpdateResult[0].affectedRows > 0) {
+      console.log(`🎉 Thanh toán thành công cho app_trans_id: ${app_trans_id}, amount: ${amount}`);
+    } else {
+      console.warn(`⚠️ Không tìm thấy order để cập nhật cho app_trans_id: ${app_trans_id}`);
+    }
 
     return res.json({ return_code: 1, return_message: "OK" });
 

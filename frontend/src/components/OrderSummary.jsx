@@ -52,62 +52,85 @@ const OrderSummary = () => {
     return () => window.removeEventListener("addToOrder", handleAddToOrder);
   }, []);
 
+  // Hàm kiểm tra trạng thái thanh toán
+  const checkPaymentStatus = async (orderId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/orders/${orderId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Không thể kiểm tra trạng thái đơn hàng");
+      }
+
+      const order = await response.json();
+      
+      if (order.payment_status === "paid") {
+        // Phát sự kiện thanh toán thành công
+        const event = new CustomEvent("payment_success", {
+          detail: { amount: order.total_amount }
+        });
+        window.dispatchEvent(event);
+
+        // Định dạng số tiền theo VNĐ
+        const formattedAmount = new Intl.NumberFormat('vi-VN', {
+          style: 'currency',
+          currency: 'VND'
+        }).format(order.total_amount);
+
+        setSuccessMessage(`Đã nhận ${formattedAmount}`);
+        setShowSuccess(true);
+        
+        // Tự động ẩn thông báo sau 5 giây
+        setTimeout(() => {
+          setShowSuccess(false);
+          // Reset form sau khi thanh toán thành công
+          setOrderItems([]);
+          setCustomerName("");
+          setCustomerPhone("");
+          setNote("");
+          setIsNewCustomer(false);
+          setZalopayQR(null);
+          setCurrentOrderId(null);
+        }, 5000);
+        
+        return true; // Thanh toán thành công
+      }
+      return false; // Chưa thanh toán
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra trạng thái thanh toán:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     let interval;
+    let checkCount = 0;
+    const maxChecks = 30; // Giới hạn kiểm tra tối đa 30 lần (1 phút với interval 2s)
     
     if (currentOrderId && paymentMethod === "zalopay") {
-      // Kiểm tra trạng thái thanh toán mỗi 3 giây
+      // Kiểm tra ngay lập tức
+      checkPaymentStatus(currentOrderId);
+      
+      // Sau đó kiểm tra mỗi 2 giây với logic thông minh
       interval = setInterval(async () => {
-        try {
-          const token = localStorage.getItem("token");
-          const response = await fetch(`${API_URL}/orders/${currentOrderId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error("Không thể kiểm tra trạng thái đơn hàng");
-          }
-
-          const order = await response.json();
-          
-          if (order.payment_status === "paid") {
-            // Phát sự kiện thanh toán thành công
-            const event = new CustomEvent("payment_success", {
-              detail: { amount: order.total_amount }
-            });
-            window.dispatchEvent(event);
-
-            // Định dạng số tiền theo VNĐ
-            const formattedAmount = new Intl.NumberFormat('vi-VN', {
-              style: 'currency',
-              currency: 'VND'
-            }).format(order.total_amount);
-
-            setSuccessMessage(`Đã nhận ${formattedAmount}`);
-            setShowSuccess(true);
-            
-            // Tự động ẩn thông báo sau 5 giây
-            setTimeout(() => {
-              setShowSuccess(false);
-              // Reset form sau khi thanh toán thành công
-              setOrderItems([]);
-              setCustomerName("");
-              setCustomerPhone("");
-              setNote("");
-              setIsNewCustomer(false);
-              setZalopayQR(null);
-              setCurrentOrderId(null);
-            }, 5000);
-            
-            // Dừng kiểm tra khi đã thanh toán thành công
-            clearInterval(interval);
-          }
-        } catch (error) {
-          console.error("Lỗi khi kiểm tra trạng thái thanh toán:", error);
+        checkCount++;
+        const isPaid = await checkPaymentStatus(currentOrderId);
+        
+        if (isPaid && interval) {
+          clearInterval(interval);
+          interval = null;
+          console.log(`✅ Thanh toán được phát hiện sau ${checkCount} lần kiểm tra`);
+        } else if (checkCount >= maxChecks) {
+          // Dừng kiểm tra sau 1 phút để tránh lãng phí tài nguyên
+          clearInterval(interval);
+          interval = null;
+          console.log("⏰ Đã dừng kiểm tra thanh toán sau 1 phút");
         }
-      }, 3000);
+      }, 2000);
     }
 
     return () => {
@@ -306,6 +329,11 @@ const OrderSummary = () => {
         // Lưu URL thanh toán để hiển thị QR code
         setZalopayQR(zalopayData.order_url);
         setCurrentAppTransId(zalopayData.app_trans_id);
+        
+        // Kiểm tra trạng thái thanh toán ngay sau khi tạo QR (sau 1 giây)
+        setTimeout(() => {
+          checkPaymentStatus(orderId);
+        }, 1000);
       } else {
         // Reset form ONLY if it's cash payment
         resetOrderState();
