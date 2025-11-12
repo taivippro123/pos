@@ -183,7 +183,10 @@ app.post("/products", (req, res) => {
 
 app.get("/products", (req, res) => {
   db.query("SELECT * FROM products", (err, result) => {
-    if (err) return res.status(500).json({ message: "Lỗi khi lấy sản phẩm" });
+    if (err) {
+      console.error("❌ MySQL error when fetching products:", err);
+      return res.status(500).json({ message: "Lỗi khi lấy sản phẩm" });
+    }
     res.json(result);
   });
 });
@@ -271,10 +274,12 @@ app.post("/orders", (req, res) => {
   // 1. Kiểm tra người dùng qua số điện thoại
   const checkUserQuery = "SELECT * FROM users WHERE phone = ?";
   db.query(checkUserQuery, [phone], (err, userResults) => {
-    if (err)
+    if (err) {
+      console.error("❌ MySQL error when checking user by phone:", err);
       return res
         .status(500)
         .json({ message: "Lỗi kiểm tra người dùng", error: err });
+    }
 
     if (userResults.length > 0) {
       // User đã tồn tại
@@ -291,10 +296,12 @@ app.post("/orders", (req, res) => {
       const insertUserQuery =
         "INSERT INTO users (name, phone, role) VALUES (?, ?, ?)";
       db.query(insertUserQuery, [name, phone, role || 'customer'], (err2, result) => {
-        if (err2)
+        if (err2) {
+          console.error("❌ MySQL error when creating new customer:", err2);
           return res
             .status(500)
             .json({ message: "Lỗi tạo người dùng mới", error: err2 });
+        }
 
         createOrder(result.insertId, name);
       });
@@ -310,8 +317,10 @@ app.post("/orders", (req, res) => {
           'SELECT manage_stock, stock_quantity FROM products WHERE id = ?',
           [product.product_id],
           (err, results) => {
-            if (err) reject(err);
-            else if (results.length === 0) reject(new Error(`Không tìm thấy sản phẩm ${product.product_id}`));
+            if (err) {
+              console.error("❌ MySQL error when checking product stock:", err);
+              reject(err);
+            } else if (results.length === 0) reject(new Error(`Không tìm thấy sản phẩm ${product.product_id}`));
             else {
               const productInfo = results[0];
               const manageStock = productInfo.manage_stock === 1 || productInfo.manage_stock === true;
@@ -333,11 +342,13 @@ app.post("/orders", (req, res) => {
         db.query(
           orderQuery,
           [user_id, total_amount, payment_method, payment_status, note],
-          (err, orderResult) => {
-            if (err)
-              return res
-                .status(500)
-                .json({ message: "Lỗi tạo đơn hàng", error: err });
+        (err, orderResult) => {
+          if (err) {
+            console.error("❌ MySQL error when inserting order:", err);
+            return res
+              .status(500)
+              .json({ message: "Lỗi tạo đơn hàng", error: err });
+          }
 
             const orderId = orderResult.insertId;
 
@@ -358,10 +369,12 @@ app.post("/orders", (req, res) => {
 
             const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
             db.query(detailQuery, [details], async (err2) => {
-              if (err2)
+              if (err2) {
+                console.error("❌ MySQL error when inserting order details:", err2);
                 return res
                   .status(500)
                   .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
+              }
 
               // 3. Cập nhật số lượng tồn kho trong bảng products
               try {
@@ -373,7 +386,10 @@ app.post("/orders", (req, res) => {
                         'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
                         [product.quantity, product.product_id],
                         (err) => {
-                          if (err) reject(err);
+                          if (err) {
+                            console.error("❌ MySQL error when decrementing stock quantity:", err);
+                            reject(err);
+                          }
                           else resolve();
                         }
                       );
@@ -425,6 +441,7 @@ app.post("/orders", (req, res) => {
         );
       })
       .catch(err => {
+        console.error("❌ Error during order creation flow:", err);
         res.status(400).json({ message: err.message });
       });
   }
@@ -588,7 +605,10 @@ app.put("/orders/:id/cancel", async (req, res) => {
         return connection.query(
           "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
           [item.quantity, item.product_id]
-        );
+        ).catch(err => {
+          console.error("❌ MySQL error when restoring stock quantity:", err);
+          throw err;
+        });
       });
     await Promise.all(stockRestorePromises);
 
