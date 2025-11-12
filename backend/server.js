@@ -340,6 +340,13 @@ app.post("/orders", (req, res) => {
                 .json({ message: "Lỗi tạo đơn hàng", error: err });
 
             const orderId = orderResult.insertId;
+
+            if (payment_method === 'cake') {
+              console.log(
+                `🧾 [CAKE ORDER] Created order ${orderId} - phone: ${phone}, customer: ${user_name}, amount: ${total_amount}, status: ${payment_status}`
+              );
+            }
+
             const details = products.map((p) => [
               orderId,
               p.product_id,
