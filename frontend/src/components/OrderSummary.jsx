@@ -34,7 +34,7 @@ const OrderSummary = () => {
     url.searchParams.set('acc', CAKE_ACCOUNT);
     url.searchParams.set('bank', CAKE_BANK);
     url.searchParams.set('amount', Math.max(0, Math.round(amount || 0)));
-    url.searchParams.set('des', `order_${orderId}`);
+    url.searchParams.set('des', `PAYHOOK_${orderId}`);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
