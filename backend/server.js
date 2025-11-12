@@ -1682,6 +1682,95 @@ app.post("/api/tts/payment-success", async (req, res) => {
   }
 });
 
+// ✅ Webhook endpoint nhận transaction từ Payhook
+app.post("/webhook/payhook", async (req, res) => {
+  try {
+    const { event, transaction, timestamp } = req.body;
+    
+    console.log("📥 NHẬN WEBHOOK TỪ PAYHOOK:", { event, transactionId: transaction?.transactionId, timestamp });
+
+    // Kiểm tra event type
+    if (event !== 'transaction.detected') {
+      console.warn("⚠️  Unknown event type:", event);
+      return res.status(400).json({ error: 'Unknown event type' });
+    }
+
+    if (!transaction || !transaction.transactionId || !transaction.amountVND) {
+      console.warn("⚠️  Missing required transaction data");
+      return res.status(400).json({ error: 'Missing required transaction data' });
+    }
+
+    // Tìm order đang pending với payment_method = 'cake' và số tiền khớp
+    // Lưu ý: Có thể cần match theo số tiền hoặc transactionId trong description/note
+    const amount = transaction.amountVND;
+    
+    // Tìm order pending với payment_method = 'cake' và số tiền gần đúng (cho phép sai số nhỏ)
+    const [orders] = await db.promise().query(
+      `SELECT id, total_amount, payment_method, payment_status 
+       FROM orders 
+       WHERE payment_method = 'cake' 
+       AND payment_status = 'pending'
+       AND ABS(total_amount - ?) <= 1000
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [amount]
+    );
+
+    if (orders.length === 0) {
+      console.warn(`⚠️  Không tìm thấy order pending với payment_method='cake' và amount=${amount}`);
+      // Vẫn trả về 200 để payhook không retry
+      return res.json({ 
+        success: false, 
+        message: 'No matching pending order found',
+        received: { transactionId: transaction.transactionId, amount }
+      });
+    }
+
+    const order = orders[0];
+    const orderId = order.id;
+
+    // Cập nhật order status thành 'paid'
+    await db.promise().query(
+      `UPDATE orders SET payment_status = 'paid' WHERE id = ?`,
+      [orderId]
+    );
+
+    console.log(`✅ Updated order ${orderId} to 'paid' status (Cake payment)`);
+
+    // Lưu thông tin transaction vào bảng transactions (nếu cần tracking)
+    try {
+      await db.promise().query(
+        `INSERT INTO transactions (order_id, app_trans_id, amount, description, status, payment_time)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [
+          orderId,
+          transaction.transactionId || `CAKE_${Date.now()}`,
+          amount,
+          `Cake payment - ${transaction.bank || 'UNKNOWN'} - ${transaction.description || ''}`,
+          'success'
+        ]
+      );
+    } catch (txError) {
+      console.warn("⚠️  Could not save transaction record:", txError.message);
+      // Không fail webhook nếu không lưu được transaction record
+    }
+
+    return res.json({ 
+      success: true, 
+      message: 'Order payment confirmed',
+      orderId,
+      amount 
+    });
+
+  } catch (error) {
+    console.error("❌ Lỗi xử lý webhook từ Payhook:", error.message);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
 // ✅ API kiểm tra kết nối DB
 app.get("/ping", (req, res) => {
   db.query("SELECT 1", (err, results) => {

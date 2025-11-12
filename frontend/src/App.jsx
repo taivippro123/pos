@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MenuPage from './pages/MenuPage';
 import InventoryPage from './pages/InventoryPage';
@@ -39,52 +39,55 @@ const App = () => {
     setIsAuthenticated(false);
   };
 
-  const ProtectedRoute = ({ children }) => {
+  if (isLoading) return null; // hoặc loading spinner
+
+  const ProtectedLayout = () => {
     if (!isAuthenticated) {
-      return <Navigate to="/login" />;
+      return <Navigate to="/login" replace />;
     }
-    return children;
+
+    return (
+      <div className="flex h-screen bg-gray-100">
+        <Sidebar onLogout={handleLogout} />
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
+        <PaymentSuccessTTS />
+      </div>
+    );
   };
 
-  const routes = [
-    { path: '/', element: <MenuPage /> },
-    { path: '/orders', element: <OrdersPage /> },
-    { path: '/inventory', element: <InventoryPage /> },
-    { path: '/customer', element: <CustomerPage /> },
-    { path: '/report', element: <ReportPage /> },
-    { path: '/settings', element: <SettingsPage /> }
-  ];
+  const LoginRoute = isAuthenticated
+    ? <Navigate to="/" replace />
+    : <LoginPage onLogin={handleLogin} />;
 
-  if (isLoading) return null; // hoặc loading spinner
+  const AppRoutes = () => {
+    const location = useLocation();
+    const showChatBot = location.pathname !== '/customer-display';
+
+    return (
+      <>
+        <Routes>
+          <Route path="/login" element={LoginRoute} />
+          <Route path="/customer-display" element={<CustomerDisplayPage />} />
+          <Route element={<ProtectedLayout />}>
+            <Route path="/" element={<MenuPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/customer" element={<CustomerPage />} />
+            <Route path="/report" element={<ReportPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        {showChatBot && <ChatBot />}
+      </>
+    );
+  };
 
   return (
     <Router>
-      <Routes>
-        <Route path="/customer-display" element={<CustomerDisplayPage />} />
-      </Routes>
-      {/* Các route khác giữ nguyên layout cũ */}
-      {window.location.pathname !== '/customer-display' && (
-        <div className="flex h-screen bg-gray-100">
-          {isAuthenticated && <Sidebar onLogout={handleLogout} />}
-          <div className="flex-1 overflow-auto">
-            <Routes>
-              <Route path="/login" element={
-                isAuthenticated ? <Navigate to="/" /> : <LoginPage onLogin={handleLogin} />
-              } />
-              {routes.map((route) => (
-                <Route
-                  key={route.path}
-                  path={route.path}
-                  element={<ProtectedRoute>{route.element}</ProtectedRoute>}
-                />
-              ))}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </div>
-          <PaymentSuccessTTS />
-        </div>
-      )}
-      {window.location.pathname !== '/customer-display' && <ChatBot />}
+      <AppRoutes />
     </Router>
   );
 };

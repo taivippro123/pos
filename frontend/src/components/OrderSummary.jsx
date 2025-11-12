@@ -118,9 +118,9 @@ const OrderSummary = () => {
   useEffect(() => {
     let interval;
     let checkCount = 0;
-    const maxChecks = 30; // Giới hạn kiểm tra tối đa 30 lần (1 phút với interval 2s)
+    const maxChecks = 60; // Giới hạn kiểm tra tối đa 60 lần (2 phút với interval 2s) - tăng cho Cake
     
-    if (currentOrderId && paymentMethod === "zalopay" && !paymentCompleted) {
+    if (currentOrderId && (paymentMethod === "zalopay" || paymentMethod === "cake") && !paymentCompleted) {
       console.log(`🔄 Bắt đầu kiểm tra thanh toán cho đơn hàng ${currentOrderId}`);
       
       // Kiểm tra ngay lập tức
@@ -295,7 +295,7 @@ const OrderSummary = () => {
           role: "customer",
           total_amount: calculateSubtotal(),
           payment_method: paymentMethod,
-          payment_status: paymentMethod === "zalopay" ? "pending" : "paid",
+          payment_status: (paymentMethod === "zalopay" || paymentMethod === "cake") ? "pending" : "paid",
           note: note,
           products: orderItems.map((item) => ({
             product_id: item.id,
@@ -317,7 +317,12 @@ const OrderSummary = () => {
       console.log("Order ID:", orderId);
       setCurrentOrderId(orderId);
 
-      if (paymentMethod === "zalopay") {
+      if (paymentMethod === "cake") {
+        // Cake payment - chờ webhook từ payhook
+        toast.info(`Đơn hàng ${orderId} đã được tạo. Đang chờ xác nhận thanh toán qua Cake...`);
+        // Bắt đầu polling để kiểm tra payment status
+        // Polling sẽ được xử lý bởi useEffect đã có sẵn cho zalopay
+      } else if (paymentMethod === "zalopay") {
         // Sau khi có orderId -> tạo thanh toán ZaloPay
         const zalopayResponse = await fetch(
           `${API_URL}/zalopay/create-order`,
@@ -504,8 +509,8 @@ const OrderSummary = () => {
             </div>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {["cash", "zalopay"].map((method) => (
+        <div className="grid grid-cols-3 gap-2">
+          {["cash", "zalopay", "cake"].map((method) => (
             <button
               key={method}
               onClick={() => setPaymentMethod(method)}
@@ -515,7 +520,7 @@ const OrderSummary = () => {
                   : "border-gray-200 text-gray-600 hover:bg-green-50 hover:border-green-200 hover:text-green-600"
               }`}
             >
-              {method === "cash" ? "Tiền mặt" : "ZaloPay"}
+              {method === "cash" ? "Tiền mặt" : method === "zalopay" ? "ZaloPay" : "Cake"}
             </button>
           ))}
         </div>
@@ -574,6 +579,21 @@ const OrderSummary = () => {
         />
       </div>
 
+      {paymentMethod === "cake" && currentOrderId && (
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg text-center border border-blue-200">
+          <h3 className="text-sm font-medium text-blue-700 mb-2">
+            Đang chờ thanh toán qua Cake (Đơn #{currentOrderId})
+          </h3>
+          <p className="text-xs text-blue-600">
+            Vui lòng chuyển khoản theo thông tin đã cung cấp. Hệ thống sẽ tự động xác nhận khi nhận được email thông báo.
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span className="text-xs text-blue-600">Đang chờ xác nhận...</span>
+          </div>
+        </div>
+      )}
+
       {paymentMethod === "zalopay" && zalopayQR && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg text-center">
           <h3 className="text-sm font-medium text-gray-700 mb-2">
@@ -602,7 +622,7 @@ const OrderSummary = () => {
       )}
 
       <div className="mt-auto pt-4 border-t border-gray-100">
-        {paymentMethod === 'zalopay' && zalopayQR ? (
+        {(paymentMethod === 'zalopay' && zalopayQR) || (paymentMethod === 'cake' && currentOrderId) ? (
           <button
             onClick={handleCancelOrder}
             disabled={isCancelling}
