@@ -15,6 +15,7 @@ const OrderSummary = () => {
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [zalopayQR, setZalopayQR] = useState(null);
+  const [cakeQR, setCakeQR] = useState(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -91,6 +92,7 @@ const OrderSummary = () => {
         // Reset state ngay lập tức để dừng polling
         setCurrentOrderId(null);
         setZalopayQR(null);
+        setCakeQR(null);
         setCurrentAppTransId(null);
         
         // Tự động ẩn thông báo sau 5 giây và reset form hoàn toàn
@@ -256,6 +258,7 @@ const OrderSummary = () => {
     setNote("");
     setIsNewCustomer(false);
     setZalopayQR(null);
+    setCakeQR(null);
     setCurrentOrderId(null);
     setCurrentAppTransId(null);
     setPaymentMethod('cash');
@@ -318,10 +321,14 @@ const OrderSummary = () => {
       setCurrentOrderId(orderId);
 
       if (paymentMethod === "cake") {
-        // Cake payment - chờ webhook từ payhook
-        toast.info(`Đơn hàng ${orderId} đã được tạo. Đang chờ xác nhận thanh toán qua Cake...`);
-        // Bắt đầu polling để kiểm tra payment status
-        // Polling sẽ được xử lý bởi useEffect đã có sẵn cho zalopay
+        // Lưu QR trả về từ backend (nếu có)
+        if (orderData.payment?.qrImage) {
+          setCakeQR(orderData.payment.qrImage);
+        } else {
+          setCakeQR(null);
+        }
+
+        toast.info(`Đơn hàng ${orderId} đã được tạo. Đang chờ khách chuyển khoản qua Cake...`);
       } else if (paymentMethod === "zalopay") {
         // Sau khi có orderId -> tạo thanh toán ZaloPay
         const zalopayResponse = await fetch(
@@ -372,6 +379,7 @@ const OrderSummary = () => {
       console.error("Lỗi khi tạo đơn hàng:", error);
       toast.error(error.message || "Có lỗi xảy ra khi tạo đơn hàng");
       setCurrentOrderId(null);
+      setCakeQR(null);
     } finally {
       setIsLoadingQR(false);
     }
@@ -416,6 +424,7 @@ const OrderSummary = () => {
       customerPhone,
       note,
       zalopayQR,
+      cakeQR,
       currentOrderId,
       total: calculateSubtotal(),
     };
@@ -426,7 +435,7 @@ const OrderSummary = () => {
     } else {
       localStorage.setItem('customerDisplayOrder', JSON.stringify(orderState));
     }
-  }, [orderItems, paymentMethod, customerName, customerPhone, note, zalopayQR, currentOrderId]);
+  }, [orderItems, paymentMethod, customerName, customerPhone, note, zalopayQR, cakeQR, currentOrderId]);
 
   return (
     <div className="w-[350px] border-l border-gray-200 bg-white p-6 flex flex-col h-full">
@@ -513,7 +522,12 @@ const OrderSummary = () => {
           {["cash", "zalopay", "cake"].map((method) => (
             <button
               key={method}
-              onClick={() => setPaymentMethod(method)}
+              onClick={() => {
+                setPaymentMethod(method);
+                if (method !== "cake") {
+                  setCakeQR(null);
+                }
+              }}
               className={`border px-2 py-1 text-xs rounded transition-colors ${
                 paymentMethod === method
                   ? "bg-green-50 border-green-200 text-green-600"
@@ -582,15 +596,27 @@ const OrderSummary = () => {
       {paymentMethod === "cake" && currentOrderId && (
         <div className="mb-4 p-4 bg-blue-50 rounded-lg text-center border border-blue-200">
           <h3 className="text-sm font-medium text-blue-700 mb-2">
-            Đang chờ thanh toán qua Cake (Đơn #{currentOrderId})
+            Chuyển khoản Cake (Đơn #{currentOrderId})
           </h3>
-          <p className="text-xs text-blue-600">
-            Vui lòng chuyển khoản theo thông tin đã cung cấp. Hệ thống sẽ tự động xác nhận khi nhận được email thông báo.
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span className="text-xs text-blue-600">Đang chờ xác nhận...</span>
-          </div>
+          {cakeQR ? (
+            <>
+              <div className="flex justify-center">
+                <img
+                  src={cakeQR}
+                  alt={`QR thanh toán đơn ${currentOrderId}`}
+                  className="rounded-lg w-48 h-48 object-contain border border-blue-200 bg-white p-2"
+                />
+              </div>
+              <p className="text-xs text-blue-600 mt-2">
+                Quét mã QR bằng ứng dụng Cake. Hệ thống sẽ tự động xác nhận khi nhận email từ ngân hàng.
+              </p>
+            </>
+          ) : (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-xs text-blue-600">Đang lấy mã QR từ Payhook...</span>
+            </div>
+          )}
         </div>
       )}
 

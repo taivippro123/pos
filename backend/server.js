@@ -350,63 +350,92 @@ app.post("/orders", (req, res) => {
             ]);
 
             const detailQuery = `INSERT INTO order_details (order_id, product_id, product_name, quantity, price_at_order, discount_percent_at_order) VALUES ?`;
-            db.query(detailQuery, [details], (err2) => {
+            db.query(detailQuery, [details], async (err2) => {
               if (err2)
                 return res
                   .status(500)
                   .json({ message: "Lỗi lưu chi tiết đơn hàng", error: err2 });
 
               // 3. Cập nhật số lượng tồn kho trong bảng products
-              const updateStockPromises = products.map((product, index) => {
-                const productInfo = productInfos[index];
-                if (productInfo.manage_stock) {
-                  return new Promise((resolve, reject) => {
-                    db.query(
-                      'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
-                      [product.quantity, product.product_id],
-                      (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                      }
-                    );
-                  });
-                }
-                return Promise.resolve();
-              });
-
-              Promise.all(updateStockPromises)
-                .then(() => {
-                  // 4. Lấy thông tin sản phẩm đã được cập nhật
-                  const productIds = products.map(p => p.product_id);
-                  db.query(
-                    'SELECT id, name, stock_quantity, manage_stock FROM products WHERE id IN (?)',
-                    [productIds],
-                    (err, updatedProducts) => {
-                      if (err) {
-                        return res.status(500).json({ message: "Lỗi lấy thông tin sản phẩm", error: err });
-                      }
-
-                      res.json({
-                        message: "Tạo đơn hàng thành công",
-                        orderId,
-                        user: {
-                          id: user_id,
-                          name: user_name,
-                          phone,
-                        },
-                        updatedProducts: updatedProducts.map(p => ({
-                          id: p.id,
-                          name: p.name,
-                          stock_quantity: p.stock_quantity,
-                          manage_stock: p.manage_stock
-                        }))
-                      });
-                    }
-                  );
-                })
-                .catch(err => {
-                  res.status(500).json({ message: "Lỗi cập nhật tồn kho", error: err });
+              try {
+                const updateStockPromises = products.map((product, index) => {
+                  const productInfo = productInfos[index];
+                  if (productInfo.manage_stock) {
+                    return new Promise((resolve, reject) => {
+                      db.query(
+                        'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
+                        [product.quantity, product.product_id],
+                        (err) => {
+                          if (err) reject(err);
+                          else resolve();
+                        }
+                      );
+                    });
+                  }
+                  return Promise.resolve();
                 });
+
+                await Promise.all(updateStockPromises);
+
+                // 4. Lấy thông tin sản phẩm đã được cập nhật
+                const productIds = products.map(p => p.product_id);
+
+                db.query(
+                  'SELECT id, name, stock_quantity, manage_stock FROM products WHERE id IN (?)',
+                  [productIds],
+                  async (err, updatedProducts) => {
+                    if (err) {
+                      return res.status(500).json({ message: "Lỗi lấy thông tin sản phẩm", error: err });
+                    }
+
+                    let qrImageUrl = null;
+
+                    if (payment_method === 'cake') {
+                      try {
+                        const qrResponse = await axios.get('https://payhook-taivippro123.fly.dev/api/qr/img', {
+                          params: {
+                            acc: process.env.CAKE_ACCOUNT || '0356882700',
+                            bank: process.env.CAKE_BANK || 'cake',
+                            amount: total_amount,
+                            des: `order_${orderId}`
+                          },
+                          responseType: 'arraybuffer',
+                          timeout: 10000
+                        });
+
+                        const base64 = Buffer.from(qrResponse.data, 'binary').toString('base64');
+                        qrImageUrl = `data:image/png;base64,${base64}`;
+                      } catch (qrError) {
+                        console.error('QR generation failed:', qrError.message);
+                      }
+                    }
+
+                    res.json({
+                      message: "Tạo đơn hàng thành công",
+                      orderId,
+                      user: {
+                        id: user_id,
+                        name: user_name,
+                        phone,
+                      },
+                      payment: {
+                        method: payment_method,
+                        status: payment_status,
+                        qrImage: qrImageUrl
+                      },
+                      updatedProducts: updatedProducts.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        stock_quantity: p.stock_quantity,
+                        manage_stock: p.manage_stock
+                      }))
+                    });
+                  }
+                );
+              } catch (stockError) {
+                console.error('Stock update error:', stockError);
+                res.status(500).json({ message: "Lỗi cập nhật tồn kho", error: stockError });
+              }
             });
           }
         );
