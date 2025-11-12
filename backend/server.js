@@ -383,31 +383,9 @@ app.post("/orders", (req, res) => {
                 db.query(
                   'SELECT id, name, stock_quantity, manage_stock FROM products WHERE id IN (?)',
                   [productIds],
-                  async (err, updatedProducts) => {
+                  (err, updatedProducts) => {
                     if (err) {
                       return res.status(500).json({ message: "Lỗi lấy thông tin sản phẩm", error: err });
-                    }
-
-                    let qrImageUrl = null;
-
-                    if (payment_method === 'cake') {
-                      try {
-                        const qrResponse = await axios.get('https://payhook-taivippro123.fly.dev/api/qr/img', {
-                          params: {
-                            acc: process.env.CAKE_ACCOUNT || '0356882700',
-                            bank: process.env.CAKE_BANK || 'cake',
-                            amount: total_amount,
-                            des: `order_${orderId}`
-                          },
-                          responseType: 'arraybuffer',
-                          timeout: 10000
-                        });
-
-                        const base64 = Buffer.from(qrResponse.data, 'binary').toString('base64');
-                        qrImageUrl = `data:image/png;base64,${base64}`;
-                      } catch (qrError) {
-                        console.error('QR generation failed:', qrError.message);
-                      }
                     }
 
                     res.json({
@@ -421,7 +399,6 @@ app.post("/orders", (req, res) => {
                       payment: {
                         method: payment_method,
                         status: payment_status,
-                        qrImage: qrImageUrl
                       },
                       updatedProducts: updatedProducts.map(p => ({
                         id: p.id,

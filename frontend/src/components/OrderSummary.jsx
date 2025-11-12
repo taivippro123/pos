@@ -5,6 +5,9 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
+const PAYHOOK_API_URL = import.meta.env.VITE_PAYHOOK_API_URL || 'https://payhook-taivippro123.fly.dev';
+const CAKE_ACCOUNT = import.meta.env.VITE_CAKE_ACCOUNT || '0356882700';
+const CAKE_BANK = import.meta.env.VITE_CAKE_BANK || 'cake';
 
 const OrderSummary = () => {
   const [orderItems, setOrderItems] = useState([]);
@@ -25,6 +28,34 @@ const OrderSummary = () => {
   const [suggestedUsers, setSuggestedUsers] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
+
+  const fetchCakeQrImage = async (orderId, amount) => {
+    const url = new URL('/api/qr/img', PAYHOOK_API_URL);
+    url.searchParams.set('acc', CAKE_ACCOUNT);
+    url.searchParams.set('bank', CAKE_BANK);
+    url.searchParams.set('amount', Math.max(0, Math.round(amount || 0)));
+    url.searchParams.set('des', `order_${orderId}`);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'image/png',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Lỗi gọi Payhook QR: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
 
   useEffect(() => {
     const handleAddToOrder = (event) => {
@@ -283,6 +314,7 @@ const OrderSummary = () => {
     setPaymentCompleted(false); // Reset trạng thái thanh toán khi tạo đơn mới
     try {
       const token = localStorage.getItem("token");
+      const totalAmount = calculateSubtotal();
 
       // Tạo đơn hàng trước
       const createOrderResponse = await fetch(`${API_URL}/orders`, {
@@ -296,7 +328,7 @@ const OrderSummary = () => {
           phone: customerPhone,
           name: customerName,
           role: "customer",
-          total_amount: calculateSubtotal(),
+          total_amount: totalAmount,
           payment_method: paymentMethod,
           payment_status: (paymentMethod === "zalopay" || paymentMethod === "cake") ? "pending" : "paid",
           note: note,
@@ -321,11 +353,13 @@ const OrderSummary = () => {
       setCurrentOrderId(orderId);
 
       if (paymentMethod === "cake") {
-        // Lưu QR trả về từ backend (nếu có)
-        if (orderData.payment?.qrImage) {
-          setCakeQR(orderData.payment.qrImage);
-        } else {
-          setCakeQR(null);
+        setCakeQR(null);
+        try {
+          const qrDataUrl = await fetchCakeQrImage(orderId, totalAmount);
+          setCakeQR(qrDataUrl);
+        } catch (qrError) {
+          console.error("Lỗi lấy QR Cake:", qrError);
+          toast.error("Không thể tải QR thanh toán Cake. Vui lòng thử lại hoặc quét thủ công.");
         }
 
         toast.info(`Đơn hàng ${orderId} đã được tạo. Đang chờ khách chuyển khoản qua Cake...`);
@@ -341,7 +375,7 @@ const OrderSummary = () => {
             },
             body: JSON.stringify({
               orderId: orderId,
-              amount: calculateSubtotal(),
+              amount: totalAmount,
               description: `Thanh toán đơn hàng ${orderId} cho ${
                 customerName || customerPhone
               }`,
